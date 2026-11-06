@@ -246,7 +246,7 @@ export default function Preview({
             !drawn && !error && <p className="muted">페이지를 그리는 중…</p>
           )}
           {!drawn && error && canLoad && (
-            <EmptyState title="이 페이지는 아직 없습니다." hint="7단계에서 컷 시트와 프롬프트를 먼저 만드세요." />
+            <EmptyState title="이 페이지는 아직 없습니다." hint="7단계 컷 시트와 8단계 프롬프트를 먼저 만드세요." />
           )}
         </div>
 

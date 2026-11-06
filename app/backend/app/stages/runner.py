@@ -997,6 +997,18 @@ def run(
 
 
 # -------------------------------------------------------------- retemplate
+def _template_panel_count(template_id: str) -> int | None:
+    """Panel count of a layout from either library, or None when unknown."""
+    moss = build.moss_layout(template_id)
+    if moss is not None:
+        return len(moss.get("panels", []))
+    tpl = next((t for t in build.library().get("templates", []) if t.get("id") == template_id), None)
+    tiers = (tpl or {}).get("tiers") or []
+    if not tiers:
+        return None
+    return max(len(tier.get("panels", [])) for tier in tiers)
+
+
 def retemplate_plan(slug: str, ep: str, page: int, template_id: str) -> dict:
     """Set a plan page's layout template (stage 5). Validates uniqueness and panel count fit."""
     root = _root(slug)
@@ -1017,36 +1029,35 @@ def retemplate_plan(slug: str, ep: str, page: int, template_id: str) -> dict:
         if p.get("template_suggestion") == template_id:
             raise StageError(f"layout {template_id} is already used on page {p.get('page')} — one layout per page per episode")
 
-    # validate template exists and panel count matches target when possible
-    valid = set(_valid_templates(project))
-    if template_id not in valid:
+    # template must exist for this project, and match the page's panel target
+    if template_id not in set(_valid_templates(project)):
         raise StageError(f"unknown or unavailable layout {template_id!r} for this project")
-    try:
-        import importlib
-        # check panel count from moss/tier libraries via build helpers
-        moss = build.moss_layout(template_id)
-        if moss is not None:
-            n = len(moss.get("panels", []))
-        else:
-            tpl = next((t for t in build.library().get("templates", []) if t.get("id") == template_id), None)
-            n = sum(len(tier.get("panels", [])) for tier in (tpl or {}).get("tiers", [])) if tpl else None
-        pt = int(target.get("panel_target", 0) or 0)
-        if n and pt and n != pt:
-            raise StageError(f"layout {template_id} has {n} panels but page {page} targets {pt} panels")
-    except StageError:
-        raise
-    except Exception:
-        pass
+    n = _template_panel_count(template_id)
+    pt = int(target.get("panel_target", 0) or 0)
+    if n and pt and n != pt:
+        raise StageError(f"layout {template_id} has {n} panels but page {page} targets {pt} panels")
+    split = target.get("split")
+    ptype = next(
+        (m.get("page_type") for m in build.pickable_layouts(project.get("detail_panels", False))
+         if m.get("id") == template_id),
+        None,
+    )
+    if ptype and split and ptype != split:
+        raise StageError(
+            f"layout {template_id} is a {ptype} page layout but page {page} is a {split} page"
+        )
+
+    before = target.get("template_suggestion")
+    target["template_suggestion"] = template_id
+    plan["pages"] = sorted(pages, key=lambda p: int(p.get("page", 0)))
+    issues = validate.validate_plan(plan, project)
+    if validate.errors(issues):
+        target["template_suggestion"] = before
+        raise StageError("plan validation failed after template change: " + _first_error(issues))
 
     history.snapshot(root, [_rel(root, plan_path)], stage="manga-5-plan",
                      note=f"template page {page} -> {template_id}", episode=ep)
-    target["template_suggestion"] = template_id
-    plan["pages"] = sorted(pages, key=lambda p: int(p.get("page", 0)))
     _write_json(plan_path, plan)
-    issues = validate.validate_plan(plan, project)
-    if validate.errors(issues):
-        # rollback? keep simple: re-raise
-        raise StageError("plan validation failed after template change: " + _first_error(issues))
     return {"ok": True, "page": page, "template_id": template_id, "issues": issues}
 
 
@@ -1140,7 +1151,7 @@ def orchestrate(
     *,
     caller: Caller | None = None,
     from_n: int = 1,
-    to_n: int = 7,
+    to_n: int = 8,
 ) -> dict:
     """Run the table in order for one episode, stopping where a human must decide.
 

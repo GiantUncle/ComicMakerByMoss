@@ -680,7 +680,7 @@ function PlanMade({
               <button type="button" className="btn" onClick={() => setEdit(null)} disabled={busy}>닫기</button>
             </div>
             <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>
-              컷 {edit.panel_target ?? "?"}개 · {SPLIT_LABEL[edit.split || ""] ?? edit.split ?? "—"} 페이지에 맞는 레이아웃만 표시됩니다. 선택 후 저장하면 계획의 template_suggestion이 바뀝니다.
+              컷 {edit.panel_target ?? "?"}개 · {SPLIT_LABEL[edit.split || ""] ?? edit.split ?? "—"} 페이지에 맞는 레이아웃만 표시됩니다. 저장하면 계획의 template_suggestion이 바뀝니다. 이미 콘티를 만들었다면 콘티(6)를 다시 실행해야 반영됩니다.
             </p>
             {err && <div className="card chip--bad" style={{ padding: "var(--s-2)" }}>{err}</div>}
             <LayoutPicker

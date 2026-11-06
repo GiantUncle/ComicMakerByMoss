@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { api, type Lang, type PreviewModel, type Snapshot } from "../api";
-import LayoutPicker from "../components/LayoutPicker";
 import ManuscriptPreview from "../components/ManuscriptPreview";
 import { KV, Note } from "../components/ui";
 import { TIERS, pxLabel, tierNote } from "../lib/canvas";
 
 /* ---------------------------------------------------------------------------
-   The page workbench — a step 7 tab, not a screen of its own.
+   The page workbench — a step 8 tab, not a screen of its own.
 
    One page at a time. The boxes never come from free-hand drawing: they come
    from the layout library, so the levers here are the real ones — the template,
@@ -40,7 +39,6 @@ export default function Workbench({
   const [prompt, setPrompt] = useState<string>("");
   const [templateId, setTemplateId] = useState("");
   const [panelCount, setPanelCount] = useState(0);
-  const [split, setSplit] = useState<"even" | "single">("even");
   const [cut, setCut] = useState<number | null>(null);
   const [cutNote, setCutNote] = useState("");
   const [history, setHistory] = useState<Snapshot[]>([]);
@@ -60,30 +58,11 @@ export default function Workbench({
         setPrompt(r.prompt);
         setTemplateId(r.layout.template_id ?? "");
         setPanelCount(r.panel_count);
-        setSplit(r.split === "single" ? "single" : "even");
         setHistory(h.filter((s) => s.stage === "manga-6-conti" || s.stage === "manga-7-sheets" || s.stage === "manga-8-prompts"));
       })
       .catch((e) => setError(String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, ep, page, lang, tier]);
-
-  async function applyTemplate() {
-    if (!templateId) return;
-    setBusy(true);
-    setError(null);
-    setNote(null);
-    try {
-      const r = await api.retemplate({ slug, episode: ep, page, layout: { template_id: templateId } });
-      setNote(r.page?.note ?? "배치를 바꿔 다시 만들었습니다");
-      const fresh = await api.pagePreview(slug, ep, page, lang, tier);
-      setModel(fresh.preview);
-      setPanelCount(fresh.panel_count);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function retakeCut() {
     if (cut === null) return;
@@ -223,26 +202,15 @@ export default function Workbench({
               <strong>컷 배치</strong>
               <span className="chip">이 페이지 컷 {panelCount}개</span>
             </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label htmlFor="w-tpl">배치 — 컷 수와 페이지 성격이 맞는 것만 적용됩니다</label>
-              <LayoutPicker
-                split={split}
-                panels={panelCount}
-                value={templateId}
-                onPick={setTemplateId}
-              />
-              {templateId && (
-                <p className="mono" style={{ fontSize: "var(--text-sm)", margin: "var(--s-2) 0 0" }}>
-                  현재 배치: {templateId}
-                </p>
-              )}
-            </div>
-            <button className="btn btn--primary" onClick={applyTemplate} disabled={busy || !templateId}>
-              배치 적용 (재빌드 + 검증)
-            </button>
             <p className="muted" style={{ fontSize: "var(--text-sm)", margin: 0 }}>
-              컷 박스는 라이브러리에서 나옵니다. 컷 수가 다른 배치는 거부됩니다 — 컷이 겹치지 않기 때문입니다.
+              레이아웃(컷 분할)은 <strong>5단계 페이지 계획</strong>에서 페이지별 <strong>‘레이아웃’</strong> 버튼으로
+              시각적으로 선택합니다. 여기서는 결과를 확인하고 컷 내용만 고칩니다.
             </p>
+            {templateId && (
+              <p className="mono" style={{ fontSize: "var(--text-sm)", margin: 0 }}>
+                현재 배치: {templateId}
+              </p>
+            )}
           </div>
 
           {cut !== null && (
