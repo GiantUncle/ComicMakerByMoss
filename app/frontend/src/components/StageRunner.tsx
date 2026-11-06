@@ -25,8 +25,8 @@ export const STAGE_LABEL: Record<string, string> = {
   "manga-4-refsheets": "레퍼런스 시트",
   "manga-5-plan": "페이지 계획",
   "manga-6-conti": "콘티 — 장면 · 대사 · 내레이션 · 효과음 (KO/EN/JA)",
-  "manga-7-sheets": "컷 시트 — 좌표 · 시트 생성",
-  "manga-8-prompts": "프롬프트 — 최종 컴파일",
+  "manga-7-sheets": "컷 시트",
+  "manga-8-prompts": "프롬프트",
 };
 
 export default function StageRunner({  slug,

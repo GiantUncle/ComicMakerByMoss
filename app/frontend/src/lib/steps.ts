@@ -7,8 +7,8 @@
  * 4 레퍼런스 시트 (project)
  * 5 페이지 계획 (episode)
  * 6 콘티 (episode)      — AI: 장면·대사·내레이션·효과음(KO/EN/JA)
- * 7 컷 시트 (episode)   — 결정적: 좌표/시트 생성
- * 8 프롬프트 (episode)  — 결정적: 최종 프롬프트 컴파일 (+ 미리보기/워크벤치)
+ *        컷 시트와 프롬프트는 같은 단계에서 자동 생성됩니다
+ * 7 프롬프트 (episode)  — 원고 미리보기/워크벤치 (+ MOSS-Image 프롬프트)
  *
  * Internal creation state may still use step 1 in the wizard when no project exists.
  */
@@ -73,23 +73,15 @@ export const STEPS: StepMeta[] = [
     label: "콘티",
     scope: "episode",
     blurb:
-      "AI가 페이지 계획대로 각 페이지를 그리는 단계입니다. 컷마다 샷 · 앵글 · 행동(beat)을 적고, 말풍선 · 내레이션 · 효과음 대사를 한국어 · 영어 · 일본어로 동시에 직접 씁니다(번역이 아닙니다). 4페이지씩 블록으로 만듭니다.",
-    stages: ["manga-6-conti"],
+      "AI가 페이지 계획대로 각 페이지를 그리는 단계입니다. 컷마다 샷 · 앵글 · 행동(beat)을 적고, 말풍선 · 내레이션 · 효과음 대사를 한국어 · 영어 · 일본어로 동시에 직접 씁니다(번역이 아닙니다). 4페이지씩 블록으로 만듭니다. 콘티가 끝나면 컷 시트와 프롬프트가 같은 단계에서 자동 생성됩니다.",
+    stages: ["manga-6-conti", "manga-7-sheets"],
   },
   {
     n: 7,
-    label: "컷 시트",
-    scope: "episode",
-    blurb:
-      "AI 없이 코드만으로 콘티와 템플릿 라이브러리를 실제 좌표로 바꾸는 단계입니다. 컷들의 위치 · 크기(bbox)와 글자 상자 크기를 계산해 sheet.json을 만듭니다. 같은 입력이면 항상 같은 결과가 나옵니다.",
-    stages: ["manga-7-sheets"],
-  },
-  {
-    n: 8,
     label: "프롬프트",
     scope: "episode",
     blurb:
-      "컷 시트를 MOSS-Image가 바로 읽을 수 있는 최종 프롬프트(prompt.txt · negative.txt)로 컴파일하는 단계입니다. 언어를 바꾸면 이 단계에서 다시 컴파일하며, 번역하지 않습니다. 원고 미리보기와 워크벤치도 이 단계 안에서 봅니다.",
+      "컷 시트를 MOSS-Image가 바로 읽을 수 있는 프롬프트(prompt.txt · negative.txt)로 컴파일하는 단계입니다. 언어를 바꾸면 이 단계에서 다시 컴파일하며, 번역하지 않습니다. 원고 미리보기와 워크벤치도 이 단계 안에서 봅니다.",
     stages: ["manga-8-prompts"],
   },
 ];

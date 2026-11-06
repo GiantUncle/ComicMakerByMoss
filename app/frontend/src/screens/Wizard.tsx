@@ -106,8 +106,8 @@ export default function Wizard({
 
   useEffect(() => {
     if (!slug || !project) return;
-    // legacy: old step 7 was combined cut/prompt; now prompts is step 8
-    if (step > 8) onStep(8);
+    // legacy: step 8 was prompts; prompts now lives on step 7
+    if (step > 7) onStep(7);
   }, [slug, project, step, onStep]);
 
   useEffect(() => {
@@ -120,10 +120,10 @@ export default function Wizard({
     if (!slug) return;
     const q = new URLSearchParams(window.location.search);
     if (ep) q.set("ep", ep); else q.delete("ep");
-    if (step === 8) q.set("tab", tab); else q.delete("tab");
-    if (step === 8) q.set("page", String(Math.max(1, page))); else q.delete("page");
-    if (step >= 3 && step <= 8) q.set("block", String(Math.max(1, block))); else q.delete("block");
-    if (step === 8) q.set("tier", tier); else q.delete("tier");
+    if (step === 7) q.set("tab", tab); else q.delete("tab");
+    if (step === 7) q.set("page", String(Math.max(1, page))); else q.delete("page");
+    if (step >= 3 && step <= 7) q.set("block", String(Math.max(1, block))); else q.delete("block");
+    if (step === 7) q.set("tier", tier); else q.delete("tier");
     const next = `${window.location.pathname}${q.toString() ? `?${q.toString()}` : ""}${window.location.hash}`;
     const cur = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (next !== cur) window.history.replaceState(null, "", next);
@@ -278,14 +278,12 @@ export default function Wizard({
 
       {slug && project && step === 6 && renderStage("manga-6-conti")}
 
-      {slug && project && step === 7 && renderStage("manga-7-sheets")}
-
-      {slug && project && step === 8 && (
+      {slug && project && step === 7 && (
         <div className="stack" style={{ gap: "var(--s-4)" }}>
           <div className="tabs" role="tablist" aria-label="프롬프트 단계">
             {(
               [
-                ["make", "프롬프트 컴파일"],
+                ["make", "프롬프트"],
                 ["preview", "원고 미리보기"],
                 ["bench", "워크벤치"],
               ] as const

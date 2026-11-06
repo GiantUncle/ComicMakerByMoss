@@ -83,6 +83,7 @@ export default function StageReview({
   onTogglePage?: (page: number) => void;
 }) {
   const [review, setReview] = useState<StageReview | null>(null);
+  const [sheetsReview, setSheetsReview] = useState<StageReview | null>(null);
   const [pool, setPool] = useState<BiblePool | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +101,11 @@ export default function StageReview({
         .bible(slug)
         .then((b) => setPool(b.pool))
         .catch(() => setPool(null));
+    }
+    // conti and sheets are one artifact pair now — sheets are built from the
+    // same conti, so the conti view shows both, per page.
+    if (stage === "manga-6-conti") {
+      api.stageReview(slug, "manga-7-sheets", ep, block).then(setSheetsReview).catch(() => setSheetsReview(null));
     }
   };
 
@@ -120,6 +126,11 @@ export default function StageReview({
         .bible(slug)
         .then((b) => alive && setPool(b.pool))
         .catch(() => alive && setPool(null));
+    }
+    if (stage === "manga-6-conti") {
+      api.stageReview(slug, "manga-7-sheets", ep, block)
+        .then((r) => alive && setSheetsReview(r))
+        .catch(() => alive && setSheetsReview(null));
     }
     return () => {
       alive = false;
@@ -191,6 +202,12 @@ export default function StageReview({
   const rows: PageRow[] = Array.isArray(review.summary.pages)
     ? (review.summary.pages as PageRow[])
     : [];
+  const sheetRows: PageRow[] =
+    stage === "manga-6-conti" && Array.isArray(sheetsReview?.summary?.pages)
+      ? ((sheetsReview.summary.pages as PageRow[]))
+      : [];
+  const sheetByPage = new Map(sheetRows.map((r) => [r.page, r]));
+  const sheetIssues = sheetsReview?.issues ?? [];
   const castRows: CastRow[] = Array.isArray(review.summary.cast)
     ? (review.summary.cast as CastRow[])
     : [];
@@ -251,7 +268,7 @@ export default function StageReview({
               }}
             />
           ) : stage === "manga-6-conti" ? (
-            <ContiBlockView rows={rows} block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
+            <ContiBlockView rows={rows} block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} sheetByPage={sheetByPage} sheetIssues={sheetIssues} sheetsErrorCount={sheetsReview?.error_count ?? 0} />
           ) : stage === "manga-7-sheets" ? (
             <BlockMade rows={rows} label="컷 시트" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
           ) : stage === "manga-8-prompts" ? (
@@ -541,11 +558,17 @@ function ContiBlockView({
   block,
   selectedPages,
   onTogglePage,
+  sheetByPage,
+  sheetIssues,
+  sheetsErrorCount,
 }: {
   rows: PageRow[];
   block: number;
   selectedPages?: number[];
   onTogglePage?: (page: number) => void;
+  sheetByPage?: Map<number, PageRow>;
+  sheetIssues?: ReviewIssue[];
+  sheetsErrorCount?: number;
 }) {
   const [layouts, setLayouts] = useState<Map<string, LayoutBox[]>>(new Map());
 
@@ -559,15 +582,25 @@ function ContiBlockView({
     return (
       <EmptyState
         title={`이 블록(${(block - 1) * 4 + 1}–${block * 4}p)에 아직 콘티가 없습니다.`}
-        hint={`위의 실행 버튼을 누르면 이 블록(${(block - 1) * 4 + 1}–${block * 4}p)만 AI로 콘티(장면·대사·내레이션·효과음, KO/EN/JA)를 작성합니다.`}
+        hint={`위의 실행 버튼을 누르면 이 블록의 콘티와 컷 시트가 함께 만들어집니다.`}
       />
     );
   }
   return (
     <div className="stack" style={{ gap: "var(--s-3)" }}>
-      <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-        콘티 — 블록 {block} ({(block - 1) * 4 + 1}–{block * 4}p). 카드를 눌러 선택, 펼쳐서 실제 콘티 내용을 확인하세요.
-      </span>
+      <div className="row" style={{ flexWrap: "wrap", alignItems: "center", gap: "var(--s-2)" }}>
+        <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
+          콘티 · 컷 시트 — 블록 {block} ({(block - 1) * 4 + 1}–{block * 4}p). 카드를 눌러 선택, 펼쳐서 실제 콘티 내용을 확인하세요.
+        </span>
+        {sheetByPage && sheetByPage.size > 0 ? (
+          <span className={"chip " + ((sheetsErrorCount ?? 0) > 0 ? "chip--bad" : "chip--ok")}>
+            {((sheetsErrorCount ?? 0) > 0) ? `컷 시트 검증 실패 · 오류 ${sheetsErrorCount}` : "컷 시트 검증 통과"}
+          </span>
+        ) : (
+          <span className="chip chip--warn">컷 시트 없음 — 콘티 실행 시 자동 생성</span>
+        )}
+      </div>
+      {sheetIssues && sheetIssues.length > 0 && <IssueList issues={sheetIssues} />}
       {rows.map((r) => {
         const split = r.split;
         const boxes = r.template_suggestion ? layouts.get(r.template_suggestion) : undefined;
@@ -592,6 +625,18 @@ function ContiBlockView({
                 <span className="chip">텍스트 {r.texts ?? texts.length}</span>
                 {split && <span className="chip">{SPLIT_LABEL[split] ?? split}</span>}
                 {r.template_suggestion && <span className="chip mono">{r.template_suggestion}</span>}
+                {sheetByPage ? (
+                  (() => {
+                    const s = sheetByPage.get(r.page);
+                    return s ? (
+                      <span className="chip chip--ok" title="컷 시트">
+                        컷 시트 ✓{s.width && s.height ? ` ${s.width}×${s.height}` : ""} 컷 {s.panels ?? "?"} · 텍스트 {s.texts ?? "?"}
+                      </span>
+                    ) : (
+                      <span className="chip chip--warn" title="컷 시트">컷 시트 없음</span>
+                    );
+                  })()
+                ) : null}
               </div>
               {boxes && <div style={{ width: 64 }}><Thumb boxes={boxes} /></div>}
             </div>
