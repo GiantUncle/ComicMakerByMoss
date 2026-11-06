@@ -126,7 +126,7 @@ export function Thumb({ boxes }: { boxes: LayoutBox[] }) {
   const h = 120 - PAD * 2;
   return (
     <svg viewBox={`0 0 100 120`} width="100%" style={{ display: "block" }} role="img">
-      <rect x={0} y={0} width={100} height={120} fill="var(--surface)" rx={2} />
+      <rect x={0} y={0} width={100} height={120} fill="var(--panel-preview-bg)" rx={2} />
       {boxes.map((b) => (
         <g key={b.n}>
           <rect
@@ -135,15 +135,16 @@ export function Thumb({ boxes }: { boxes: LayoutBox[] }) {
             width={b.w * w}
             height={b.h * h}
             fill="var(--surface-2)"
-            stroke={b.n === 1 ? "var(--primary)" : "var(--border)"}
-            strokeWidth={b.n === 1 ? 1.6 : 1}
+            stroke={b.n === 1 ? "var(--primary)" : "var(--panel-preview-line)"}
+            strokeWidth={b.n === 1 ? 2.5 : 2}
           />
           <text
             x={PAD + (b.x + b.w / 2) * w}
-            y={PAD + (b.y + b.h / 2) * h + 3}
-            fontSize={7}
+            y={PAD + (b.y + b.h / 2) * h + 5}
+            fontSize={14}
+            fontWeight={700}
             textAnchor="middle"
-            fill="var(--fg-muted)"
+            fill="var(--fg)"
             style={{ pointerEvents: "none" }}
           >
             {b.n}
