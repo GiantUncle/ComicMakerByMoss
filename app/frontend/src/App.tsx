@@ -37,7 +37,7 @@ function readUrl() {
   };
 }
 
-type RailState = "done" | "ready" | "blocked" | "idle";
+type RailState = "done" | "stale" | "ready" | "blocked" | "idle";
 
 interface RailRow {
   state: RailState;
@@ -332,6 +332,8 @@ export function railRow(n: number, stages: StageStatus[], slug: string | null): 
   if (rows.some((r) => stageState(r.state) === "skip")) {
     return { state: "blocked", note: "이 프로젝트 모드에는 없습니다" };
   }
+  const stale = rows.find((r) => stageState(r.state) === "stale");
+  if (stale) return { state: "stale", note: stale.reason || "이전 단계 변경됨 · 재작업 필요" };
   if (rows.every((r) => stageState(r.state) === "done")) return { state: "done", note: "완료" };
   const waiting = rows.find((r) => stageState(r.state) === "waiting");
   if (waiting) return { state: "blocked", note: waiting.reason || "다른 단계 먼저" };

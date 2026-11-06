@@ -263,6 +263,11 @@ export default function StageReview({
 
       {/* ---------------------------------------------- ① what it made -- */}
       <StepSection n={1} title="현재 결과" hint={MADE_HINT[stage]} accent="made">
+        {review.stale && (
+          <Note tone="warn">
+            {review.stale_reason || "이전 단계가 변경되어 아래 결과는 낡았습니다. 다시 실행하세요."}
+          </Note>
+        )}
         {!review.exists ? (
           <EmptyState
             title={PER_BLOCK.has(stage) ? `이 블록(${(block - 1) * 4 + 1}–${block * 4}p)에 아직 결과가 없습니다.` : "아직 결과가 없습니다."}
@@ -680,7 +685,7 @@ function PlanMade({
               <button type="button" className="btn" onClick={() => setEdit(null)} disabled={busy}>닫기</button>
             </div>
             <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>
-              컷 {edit.panel_target ?? "?"}개 · {SPLIT_LABEL[edit.split || ""] ?? edit.split ?? "—"} 페이지에 맞는 레이아웃만 표시됩니다. 저장하면 계획의 template_suggestion이 바뀝니다. 이미 콘티를 만들었다면 콘티(6)를 다시 실행해야 반영됩니다.
+              컷 {edit.panel_target ?? "?"}개 · {SPLIT_LABEL[edit.split || ""] ?? edit.split ?? "—"} 페이지에 맞는 레이아웃만 표시됩니다. 저장하면 계획의 template_suggestion이 바뀌고, 이미 만든 6·7·8단계 결과는 낡은 것으로 표시됩니다 — 저장 후 왼쪽 메뉴에서 ‘재작업 필요’를 확인하고 순서대로 다시 실행하세요.
             </p>
             {err && <div className="card chip--bad" style={{ padding: "var(--s-2)" }}>{err}</div>}
             <LayoutPicker

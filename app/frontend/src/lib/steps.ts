@@ -97,12 +97,14 @@ export const SCOPE_LABEL: Record<Scope, string> = {
   episode: "에피소드마다",
 };
 
-export type StageState = "done" | "ready" | "waiting" | "skip";
+export type StageState = "done" | "stale" | "ready" | "waiting" | "skip";
 
 export function stageState(s: string | undefined | null): StageState {
   switch (s) {
     case "done":
       return "done";
+    case "stale":
+      return "stale";
     case "ready":
       return "ready";
     case "blocked":
@@ -115,6 +117,7 @@ export function stageState(s: string | undefined | null): StageState {
 
 export const STATE_LABEL: Record<StageState, { text: string; cls: string }> = {
   done: { text: "완료", cls: "chip--ok" },
+  stale: { text: "변경됨 · 재작업 필요", cls: "chip--warn" },
   ready: { text: "실행 가능", cls: "" },
   waiting: { text: "다른 단계 먼저", cls: "chip--warn" },
   skip: { text: "이 프로젝트에는 없음", cls: "" },

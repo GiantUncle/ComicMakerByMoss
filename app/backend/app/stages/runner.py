@@ -1381,6 +1381,12 @@ def review(slug: str, stage_id: str, *, ep: str | None = None, block: int = 1) -
         except Exception:
             updated_at = None
 
+    stale: list[int] = []
+    if ep and stage.per_block:
+        try:
+            stale = registry.stale_pages(root, ep, stage_id, block)
+        except Exception:
+            stale = []
     return {
         "stage": stage_id,
         "exists": bool(files),
@@ -1391,6 +1397,13 @@ def review(slug: str, stage_id: str, *, ep: str | None = None, block: int = 1) -
         "summary": summary,
         "history": history.list_snapshots(root, stage_id)[:20],
         "updated_at": updated_at,
+        "stale": bool(stale),
+        "stale_pages": stale,
+        "stale_reason": (
+            f"이전 단계가 변경됨 — 아래 결과는 낡았습니다 "
+            f"({', '.join(str(p) for p in stale)}p). 다시 실행하세요."
+            if stale else None
+        ),
     }
 
 

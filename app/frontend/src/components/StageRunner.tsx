@@ -333,7 +333,7 @@ export default function StageRunner({  slug,
                 {batch?.running && selectedPages.length > 0 ? `실행 중… ${batch.current}/${batch.total}` : `선택한 페이지만 다시${selectedPages.length > 0 ? ` (${selectedPages.length})` : ""}`}
               </button>
             )}
-            {status && stageState(status.state) === "done" ? (
+            {status && (stageState(status.state) === "done" || stageState(status.state) === "stale") ? (
               <button className="btn btn--primary" onClick={rerunWhole} disabled={busy} title={perBlock && blocks > 1 ? "모든 블록을 1번부터 순서대로 다시 실행합니다" : undefined}>
                 {batch?.running ? `실행 중… ${batch.current}/${batch.total} (${blockRange(batch.current)})` : busy ? "실행 중…" : perBlock && blocks > 1 ? `전체 블록 다시 실행 (1–${blocks})` : "이 단계 다시 실행"}
               </button>
@@ -341,7 +341,7 @@ export default function StageRunner({  slug,
               <button
                 className="btn btn--primary"
                 onClick={() => run(false)}
-                disabled={busy || (status ? stageState(status.state) !== "ready" : true)}
+                disabled={busy || (status ? stageState(status.state) !== "ready" && stageState(status.state) !== "stale" : true)}
                 title={perBlock && blocks > 1 ? "모든 블록을 1번부터 순서대로 실행합니다" : undefined}
               >
                 {batch?.running ? `실행 중… ${batch.current}/${batch.total} (${blockRange(batch.current)})` : busy ? "실행 중…" : perBlock && blocks > 1 ? `전체 블록 실행 (1–${blocks})` : "이 단계 실행"}
@@ -379,7 +379,13 @@ export default function StageRunner({  slug,
         </div>
       </div>
 
-      {!hasProvider && providers !== null && status?.state === "ready" && (
+      {status && stageState(status.state) === "stale" && (
+        <Note tone="warn">
+          {status.reason || "이전 단계가 변경되어 아래 결과는 낡았습니다."} 다시 실행하면 최신 결과로 교체됩니다.
+        </Note>
+      )}
+
+      {!hasProvider && providers !== null && (status?.state === "ready" || status?.state === "stale") && (
         <Note tone="warn">
           프로바이더가 설정되어 있지 않아 모델을 부를 수 없습니다.{" "}
           {onProviders && (

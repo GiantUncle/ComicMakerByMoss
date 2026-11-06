@@ -74,7 +74,7 @@ export interface StageStatus {
   n: number;
   scope: string;
   mode: string;
-  state: "done" | "ready" | "waiting" | "not-for-this-project";
+  state: "done" | "stale" | "ready" | "waiting" | "not-for-this-project";
   reason: string;
   gate: string | null;
   outputs: string[];
@@ -115,6 +115,9 @@ export interface StageReview {
   summary: Record<string, unknown>;
   history?: Snapshot[];
   updated_at?: string | null;
+  stale?: boolean;
+  stale_pages?: number[];
+  stale_reason?: string | null;
 }
 
 export interface BibleCard {
