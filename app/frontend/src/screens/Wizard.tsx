@@ -175,6 +175,20 @@ export default function Wizard({
   }
 
   const meta = stepMeta(step);
+  const headState: { text: string; cls: string } | null = (() => {
+    if (!slug || !project) return { text: "현재 결과 없음", cls: "" };
+    const stageId = meta?.stages?.[0];
+    if (step === 2) return { text: "설정됨", cls: "chip--ok" };
+    if (!stageId) return null;
+    const st = stages.find((s) => s.id === stageId);
+    if (!st) return { text: "현재 결과 없음", cls: "" };
+    const s = stageState(st.state);
+    if (s === "done") return { text: "현재 결과 있음", cls: "chip--ok" };
+    if (s === "stale") return { text: "변경됨 — 다시 만들기", cls: "chip--warn" };
+    if (s === "waiting") return { text: "먼저 필요한 단계", cls: "chip--warn" };
+    if (s === "ready") return { text: "현재 결과 없음", cls: "" };
+    return { text: st.reason ?? "이 프로젝트에는 없음", cls: "" };
+  })();
 
   function renderStage(stageId: string, extra?: { onPickCut?: (p: number) => void }) {
     const st = stages.find((s) => s.id === stageId);
@@ -210,8 +224,13 @@ export default function Wizard({
           <div className="step-title">
             {meta.n} · {meta.label}
             <span className="chip">{SCOPE_LABEL[meta.scope]}</span>
+            {headState && <span className={"chip " + headState.cls}>{headState.text}</span>}
+            {step > 1 && (
+              <button className="btn" onClick={() => onStep(step - 1)} style={{ marginLeft: "auto" }}>
+                ← {stepMeta(step - 1)?.label}
+              </button>
+            )}
           </div>
-          <p className="step-blurb">{meta.blurb}</p>
         </div>
       )}
 
@@ -313,17 +332,6 @@ export default function Wizard({
               onLang={onLang}
             />
           )}
-        </div>
-      )}
-
-      {step > 1 && (
-        <div className="row">
-          <button className="btn" onClick={() => onStep(step - 1)}>
-            ← {stepMeta(step - 1)?.label} 단계로
-          </button>
-          <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-            왼쪽 목록에서 어느 단계로든 바로 갈 수 있습니다
-          </span>
         </div>
       )}
     </div>

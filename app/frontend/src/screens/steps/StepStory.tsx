@@ -178,17 +178,20 @@ export default function StepStory({
 
   return (
     <div className="stack" style={{ gap: "var(--s-4)" }}>
-      <div className="pagebar">
-        <div className="pagebar-title">
-          스토리
+      <div className="actionbar">
+        <div className="actionbar-state">
+          <strong style={{ fontSize: "var(--text-lg)" }}>스토리</strong>
           <span className="chip">에피소드 {current}</span>
-          {approved ? <span className="chip chip--ok">저장됨</span> : <span className="chip chip--warn">미저장/미승인</span>}
-          {sourceKind === "brief" && <span className="chip">아이디어(생성 전)</span>}
+          {approved ? <span className="chip chip--ok">저장됨</span> : <span className="chip chip--warn">미저장</span>}
+          {sourceKind === "brief" && <span className="chip">아이디어</span>}
+          <span className="actionbar-msg">
+            {approved ? "현재 원문 있음 — 아래 확인" : "현재 원문 없음 — 붙여넣고 저장"}
+          </span>
         </div>
-        <div className="pagebar-side">
+        <div className="row" style={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
           {episodes.length > 1 && (
             <label className="row" style={{ gap: "var(--s-2)", fontSize: "var(--text-sm)" }}>
-              에피소드
+              <span className="muted">에피소드</span>
               <select value={current} onChange={(e) => onEp(e.target.value)}>
                 {episodes.map((e) => (
                   <option key={e.id} value={e.id}>
@@ -198,12 +201,18 @@ export default function StepStory({
               </select>
             </label>
           )}
+          <button type="button" className="btn" onClick={saveText} disabled={busyAll || !current || !text.trim()}>
+            저장
+          </button>
+          <button type="button" className="btn btn--primary" onClick={generateNovel} disabled={busyAll || !current || !text.trim()}>
+            {busyAll ? "생성 중…" : "AI로 소설 생성"}
+          </button>
         </div>
       </div>
 
       <div className="card stack">
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="story-text">스토리 / 아이디어</label>
+          <label htmlFor="story-text">현재 원문</label>
           <textarea
             id="story-text"
             value={text}
@@ -212,22 +221,10 @@ export default function StepStory({
             spellCheck={false}
             style={{ minHeight: 320, fontFamily: "inherit", lineHeight: 1.6 }}
           />
-          <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-            붙여넣은 내용을 그대로 쓸 때는 <strong>저장</strong>, 아이디어/개요에서 소설을 만들 때는 <strong>AI로 소설 생성</strong>을 누르세요.
-          </span>
         </div>
 
         {(error || localError) && <Note tone="bad">{error || localError}</Note>}
         {(note || localNote) && <Note tone="ok">{note || localNote}</Note>}
-
-        <div className="row" style={{ flexWrap: "wrap" }}>
-          <button type="button" className="btn" onClick={saveText} disabled={busyAll || !current || !text.trim()}>
-            저장
-          </button>
-          <button type="button" className="btn btn--primary" onClick={generateNovel} disabled={busyAll || !current || !text.trim()}>
-            {busyAll ? "생성 중…" : "AI로 소설 생성"}
-          </button>
-        </div>
       </div>
 
       <div className="card stack-tight">

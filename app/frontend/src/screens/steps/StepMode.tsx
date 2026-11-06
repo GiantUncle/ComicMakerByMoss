@@ -1,7 +1,15 @@
 import { useState } from "react";
 import type { NewProjectIn, ProjectSummary } from "../../api";
-import { EmptyState, KV, Note, StepSection, Verdict } from "../../components/ui";
+import { KV, Note } from "../../components/ui";
 import { TIERS, pxLabel } from "../../lib/canvas";
+
+/**
+ * Step 1 — mode.
+ *
+ * State first: no project yet -> empty with the create action at the top;
+ * project exists -> current facts with the one save action at the top.
+ * No narrative about what the stage "made" or whether it is "sound".
+ */
 
 /**
  * Step 1 — 모드.
@@ -110,137 +118,122 @@ export default function StepMode({
         detail: slug || "영문 제목에서 자동으로 만들어집니다",
       },
       { ok: 1 <= draft.min && draft.min <= draft.max && draft.max <= 8, text: "페이지당 컷 수 — 1컷 이상, 최대 8컷 이하" },
-      { ok: TIERS.some((t) => t.id === draft.tier), text: `캔버스 해상도 — ${pxLabel(draft.tier)}` },
+      { ok: TIERS.some((t) => t.id === draft.tier), text: "캔버스 해상도 — " + pxLabel(draft.tier) },
       { ok: true, text: "제목 — 언거나 비워도 됩니다 (나중에 고칠 수 있습니다)", info: true },
     ];
     const ok = checks.every((c) => c.ok || c.info);
 
     return (
-      <div className="stack" style={{ gap: "var(--s-6)" }}>
-        <StepSection n={1} title="이 단계가 만든 것" accent="made">
-          <EmptyState
-            title="아직 프로젝트가 없습니다."
-            hint="아래에서 모드를 고르면 프로젝트가 생깁니다. 나머지는 전부 기본값입니다."
-          />
-        </StepSection>
+      <div className="stack" style={{ gap: "var(--s-4)" }}>
+        <div className="actionbar">
+          <div className="actionbar-state">
+            <strong style={{ fontSize: "var(--text-lg)" }}>새 프로젝트</strong>
+            <span className="chip">현재 결과 없음</span>
+            <span className="actionbar-msg">{ok ? "만들 수 있음" : "아래 확인 — 조건 미충족"}</span>
+          </div>
+          <button
+            className="btn btn--primary"
+            disabled={busy || !ok}
+            onClick={() =>
+              onCreate({
+                slug,
+                title: draft.title,
+                mode: draft.mode,
+                languages: { default: "ko", all: ["ko", "en", "ja"] },
+                reading_direction: draft.reading_direction,
+                canvas: { tier: draft.tier, ratio: "a4_portrait" },
+                art_style: draft.art_style,
+                panels: { min: draft.min, max: draft.max },
+                cut_mode: draft.cut_mode,
+                detail_panels: draft.detail_panels,
+                story_focus: draft.story_focus,
+                episode_pages: draft.episode_pages,
+              })
+            }
+          >
+            프로젝트 만들고 계속
+          </button>
+        </div>
 
-        <StepSection
-          n={2}
-          title="검증 — 정상인지"
-          hint="만들기 전에 확인하는 규칙입니다. 어기면 만들기 버튼이 이유를 말합니다."
-        >
-          <Verdict errorCount={ok ? 0 : 1} okText="만들 조건을 만족했습니다">
-            <div className="rows">
-              {checks.map((c, i) => (
-                <div
-                  key={i}
-                  className={`rowitem${c.ok ? "" : ""}`}
-                  style={c.ok ? undefined : { borderColor: "var(--danger)" }}
-                >
-                  <span className={`chip ${c.ok ? "chip--ok" : "chip--bad"}`}>{c.ok ? "✓" : "✕"}</span>
-                  <span style={{ flex: 1, fontSize: "var(--text-sm)" }}>
-                    {c.text}
-                    {c.detail && (
-                      <span className="muted" style={{ display: "block" }}>
-                        {c.detail}
-                      </span>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Verdict>
-        </StepSection>
-
-        <StepSection n={3} title="리테이크 — 고칠 부분을 골라 다시">
-          <div className="stack">
-            <div className="cards">
-              {MODES.map((m) => (
-                <button
-                  key={m.id}
-                  className="rowitem rowitem--pick"
-                  aria-pressed={draft.mode === m.id}
-                  onClick={() => set({ mode: m.id })}
-                  style={{ alignItems: "flex-start", flexDirection: "column", gap: "var(--s-2)" }}
-                >
-                  <strong>{m.label}</strong>
-                  <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-                    {m.desc}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="field">
-              <label htmlFor="n-slug">프로젝트 식별자 (폴더 이름 — 비우면 영문 제목에서 만들어집니다)</label>
-              <input
-                id="n-slug"
-                value={draft.slug}
-                placeholder="talk-show"
-                onChange={(e) => set({ slug: e.target.value })}
-              />
-            </div>
-
-            <div className="field">
-              <label>제목 — 언어별로 한 줄씩 (비워도 됩니다)</label>
-              <div className="row">
-                {(["ko", "en", "ja"] as const).map((l) => (
-                  <input
-                    key={l}
-                    aria-label={`제목 ${l}`}
-                    placeholder={l.toUpperCase()}
-                    value={draft.title[l]}
-                    onChange={(e) => {
-                      const title = { ...draft.title, [l]: e.target.value };
-                      if (l === "en" && !draft.slug) {
-                        setDraft({ ...draft, title, slug: slugify(e.target.value) });
-                      } else {
-                        set({ title });
-                      }
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <p className="muted" style={{ fontSize: "var(--text-sm)", margin: 0 }}>
-              읽기 방향 오른쪽→왼쪽 · 해상도 {pxLabel("M")} · 화풍 {STYLES[0].label.split(" — ")[0]} · 페이지당 컷 3~4개.
-              이 다섯은 3단계 설정에서 바꿉니다.
-            </p>
-
-            {error && <Note tone="bad">{error}</Note>}
-            {note && <Note tone="ok">{note}</Note>}
-
-            <div className="row">
+        <div className="card stack">
+          <div className="cards">
+            {MODES.map((m) => (
               <button
-                className="btn btn--primary"
-                disabled={busy || !ok}
-                onClick={() =>
-                  onCreate({
-                    slug,
-                    title: draft.title,
-                    mode: draft.mode,
-                    languages: { default: "ko", all: ["ko", "en", "ja"] },
-                    reading_direction: draft.reading_direction,
-                    canvas: { tier: draft.tier, ratio: "a4_portrait" },
-                    art_style: draft.art_style,
-                    panels: { min: draft.min, max: draft.max },
-                    cut_mode: draft.cut_mode,
-                    detail_panels: draft.detail_panels,
-                    story_focus: draft.story_focus,
-                    episode_pages: draft.episode_pages,
-                  })
-                }
+                key={m.id}
+                className="rowitem rowitem--pick"
+                aria-pressed={draft.mode === m.id}
+                onClick={() => set({ mode: m.id })}
+                style={{ alignItems: "flex-start", flexDirection: "column", gap: "var(--s-2)" }}
               >
-                프로젝트 만들고 계속
+                <strong>{m.label}</strong>
+                <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
+                  {m.desc}
+                </span>
               </button>
-              <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-                project.json 과 wizard.json 이 생깁니다
-              </span>
+            ))}
+          </div>
+
+          <div className="field">
+            <label htmlFor="n-slug">프로젝트 식별자 (폴더 이름 — 비우면 영문 제목에서 만들어집니다)</label>
+            <input
+              id="n-slug"
+              value={draft.slug}
+              placeholder="talk-show"
+              onChange={(e) => set({ slug: e.target.value })}
+            />
+          </div>
+
+          <div className="field">
+            <label>제목 — 언어별로 한 줄씩 (비워도 됩니다)</label>
+            <div className="row">
+              {(["ko", "en", "ja"] as const).map((l) => (
+                <input
+                  key={l}
+                  aria-label={"제목 " + l}
+                  placeholder={l.toUpperCase()}
+                  value={draft.title[l]}
+                  onChange={(e) => {
+                    const title = { ...draft.title, [l]: e.target.value };
+                    if (l === "en" && !draft.slug) {
+                      setDraft({ ...draft, title, slug: slugify(e.target.value) });
+                    } else {
+                      set({ title });
+                    }
+                  }}
+                  style={{ flex: 1 }}
+                />
+              ))}
             </div>
           </div>
-        </StepSection>
+
+          <div className="rows">
+            {checks.map((c, i) => (
+              <div
+                key={i}
+                className="rowitem"
+                style={c.ok ? undefined : { borderColor: "var(--danger)" }}
+              >
+                <span className={"chip " + (c.ok ? "chip--ok" : "chip--bad")}>{c.ok ? "✓" : "✕"}</span>
+                <span style={{ flex: 1, fontSize: "var(--text-sm)" }}>
+                  {c.text}
+                  {c.detail && (
+                    <span className="muted" style={{ display: "block" }}>
+                      {c.detail}
+                    </span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <p className="muted" style={{ fontSize: "var(--text-sm)", margin: 0 }}>
+            읽기 방향 오른쪽→왼쪽 · 해상도 {pxLabel("M")} · 화풍 {STYLES[0].label.split(" — ")[0]} · 페이지당 컷 3~4개.
+            이 다섯은 2단계 설정에서 바꿉니다.
+          </p>
+
+          {error && <Note tone="bad">{error}</Note>}
+          {note && <Note tone="ok">{note}</Note>}
+        </div>
       </div>
     );
   }
@@ -263,71 +256,49 @@ export default function StepMode({
   ];
 
   return (
-    <div className="stack" style={{ gap: "var(--s-6)" }}>
-      <StepSection n={1} title="이 단계가 만든 것" accent="made" hint="프로젝트 뼈대 — project.json">
-        <div className="card">
-          <KV rows={facts.map(([k, v]) => [k, v] as [string, string])} />
+    <div className="stack" style={{ gap: "var(--s-4)" }}>
+      <div className="actionbar">
+        <div className="actionbar-state">
+          <strong style={{ fontSize: "var(--text-lg)" }}>프로젝트</strong>
+          <span className={"chip " + (dirty ? "chip--warn" : "chip--ok")}>
+            {dirty ? "변경됨 — 저장 필요" : "현재 상태"}
+          </span>
+          <span className="actionbar-msg">{dirty ? "제목을 고친 뒤 위 버튼으로 저장" : "현재 설정 — 아래 확인"}</span>
         </div>
-      </StepSection>
+        <button className="btn btn--primary" disabled={busy || !dirty} onClick={() => onSave({ title })}>
+          제목 저장
+        </button>
+      </div>
 
-      <StepSection
-        n={2}
-        title="검증 — 정상인지"
-        hint="프로젝트 파일 자체를 검사합니다. 설정을 고치면 3단계에서 다시 검증합니다."
-      >
-        <Verdict errorCount={0} okText="project.json 이 규칙을 지킵니다">
-          <div className="rows">
-            <div className="rowitem">
-              <span className="chip chip--ok">✓</span>
-              <span style={{ fontSize: "var(--text-sm)" }}>
-                컷 수 범위 {project.panels?.min}~{project.panels?.max} — 5단계와 6단계가 이 안에서만 페이지를
-                만듭니다
-              </span>
-            </div>
-            <div className="rowitem">
-              <span className="chip chip--ok">✓</span>
-              <span style={{ fontSize: "var(--text-sm)" }}>
-                해상도 {pxLabel(project.canvas?.tier)} — 좌표가 이 크기에 물려 컴파일됩니다
-              </span>
-            </div>
-          </div>
-        </Verdict>
-      </StepSection>
+      <div className="card">
+        <KV rows={facts.map(([k, v]) => [k, v] as [string, string])} />
+      </div>
 
-      <StepSection n={3} title="리테이크 — 고칠 부분을 골라 다시">
-        <div className="stack">
-          <div className="field">
-            <label>제목 — 언어별 (바꾸면 저장 즉시 헤더와 모든 단계에 반영됩니다)</label>
-            <div className="row">
-              {(["ko", "en", "ja"] as const).map((l) => (
-                <input
-                  key={l}
-                  aria-label={`제목 ${l}`}
-                  placeholder={l.toUpperCase()}
-                  value={title[l] ?? ""}
-                  onChange={(e) => setTitle({ ...title, [l]: e.target.value })}
-                  style={{ flex: 1 }}
-                />
-              ))}
-            </div>
-          </div>
-
+      <div className="card stack">
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>제목 — 언어별</label>
           <div className="row">
-            <button className="btn btn--primary" disabled={busy || !dirty} onClick={() => onSave({ title })}>
-              제목 저장
-            </button>
-            {!dirty && <span className="muted" style={{ fontSize: "var(--text-sm)" }}>고친 것이 없습니다</span>}
+            {(["ko", "en", "ja"] as const).map((l) => (
+              <input
+                key={l}
+                aria-label={"제목 " + l}
+                placeholder={l.toUpperCase()}
+                value={title[l] ?? ""}
+                onChange={(e) => setTitle({ ...title, [l]: e.target.value })}
+                style={{ flex: 1 }}
+              />
+            ))}
           </div>
-
-          <p className="muted" style={{ fontSize: "var(--text-sm)", margin: 0 }}>
-            모드는 프로젝트를 만들 때 정하기 때문에 바꿀 수 없습니다 — 일러스트 · 코믹스 · 만화는 뒤 단계의
-            개수가 다릅니다. 바꾸고 싶으면 새 프로젝트를 만드세요. 해상도 · 컷 수 · 화풍은 3단계에서 바꿉니다.
-          </p>
-
-          {error && <Note tone="bad">{error}</Note>}
-          {note && <Note tone="ok">{note}</Note>}
         </div>
-      </StepSection>
+
+        <p className="muted" style={{ fontSize: "var(--text-sm)", margin: 0 }}>
+          모드는 프로젝트를 만들 때 정하기 때문에 바꿀 수 없습니다 — 일러스트 · 코믹스 · 만화는 뒤 단계의
+          개수가 다릅니다. 바꾸고 싶으면 새 프로젝트를 만드세요. 해상도 · 컷 수 · 화풍은 2단계에서 바꿉니다.
+        </p>
+
+        {error && <Note tone="bad">{error}</Note>}
+        {note && <Note tone="ok">{note}</Note>}
+      </div>
     </div>
   );
 }

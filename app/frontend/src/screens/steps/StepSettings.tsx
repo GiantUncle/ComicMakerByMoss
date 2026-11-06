@@ -129,7 +129,27 @@ export default function StepSettings({
   const left = ((lo - 1) / 7) * 100;
   const right = ((hi - 1) / 7) * 100;
 
+  const dirty =
+    JSON.stringify(draft) !== JSON.stringify(draftOf(project)) ||
+    !!error ||
+    !!local;
+
   return (
+    <div className="stack" style={{ gap: "var(--s-4)" }}>
+      <div className="actionbar">
+        <div className="actionbar-state">
+          <strong style={{ fontSize: "var(--text-lg)" }}>프로젝트 설정</strong>
+          <span className={`chip ${dirty ? "chip--warn" : "chip--ok"}`}>
+            {dirty ? "변경됨 — 저장 필요" : "저장됨"}
+          </span>
+          <span className="actionbar-msg">
+            {dirty ? "아래 값을 고친 뒤 위 버튼으로 저장" : "현재 설정 — 아래 확인"}
+          </span>
+        </div>
+        <button type="button" className="btn btn--primary" onClick={save} disabled={busy || !rangeOk}>
+          설정 저장
+        </button>
+      </div>
     <div className="card" style={{ padding: "var(--s-4)" }}>
       <div className="settings-grid">
         <div className="field settings-span-2" style={{ margin: 0 }}>
@@ -268,13 +288,8 @@ export default function StepSettings({
         {error && <div className="settings-span-2"><Note tone="bad">{error}</Note></div>}
         {local && <div className="settings-span-2"><Note tone="bad">{local}</Note></div>}
         {note && <div className="settings-span-2"><Note tone="ok">{note}</Note></div>}
-
-        <div className="row settings-span-2" style={{ margin: 0 }}>
-          <button type="button" className="btn btn--primary" onClick={save} disabled={busy || !rangeOk}>
-            설정 저장
-          </button>
-        </div>
       </div>
+    </div>
     </div>
   );
 }

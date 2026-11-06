@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 /**
  * Small shared pieces every step screen is built from.
  *
- * A step always reads the same way — what it made, whether that is sound, what
- * to redo — so the three sections and the verdict are one component each, not
- * seven near-copies.
+ * A step always reads the same way — its current state at the top, the
+ * artifact below it, and any failing issues inline. There is no narrative
+ * about what a stage "did" or what to redo at the page tail: the sticky top
+ * bar owns the action.
  */
 
 export function Note({ tone, children }: { tone: "ok" | "bad" | "warn"; children: ReactNode }) {

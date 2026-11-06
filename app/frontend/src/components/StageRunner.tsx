@@ -12,10 +12,10 @@ import { getRun, runKey, setRun, subscribeRun } from "../lib/runState";
 /**
  * One stage, runnable.
  *
- * The step screen for any of the model stages: the run, what the run wrote,
- * then the review (what it made · whether it is sound · what to redo) and the
- * rules that stage runs by. Block stages (conti, pages) work four pages at a
- * time, so they carry a block stepper.
+ * The step screen for any of the model stages: a sticky top bar with the
+ * current state and the one primary action, then the current artifact below
+ * it. Block stages (conti, pages) work four pages at a time, so they carry a
+ * block stepper in the top bar.
  */
 
 export const STAGE_LABEL: Record<string, string> = {
@@ -285,29 +285,36 @@ export default function StageRunner({  slug,
 
   const hasProvider = (providers?.length ?? 0) > 0;
   const meta = status ? STATE_LABEL[stageState(status.state)] : null;
+  const st = status ? stageState(status.state) : null;
+  const validationFailed =
+    (result?.issues ?? []).some((i) => i.level === "error") || !!error;
+  const stateMsg =
+    st === "waiting"
+      ? status?.reason ?? "먼저 필요한 단계가 있습니다."
+      : st === "skip"
+        ? status?.reason ?? "이 프로젝트에는 없습니다."
+        : st === "stale"
+          ? "이전 단계가 바뀌어 현재 결과는 낡았습니다 — 다시 만드세요."
+          : validationFailed
+            ? "검증 실패 — 다시 만드세요."
+            : st === "done"
+              ? "현재 결과 있음 — 아래 확인"
+              : "현재 결과 없음 — 만들 것 있음";
 
   return (
     <div className="stack" style={{ gap: "var(--s-4)" }}>
-      <div className="card between">
-        <div className="stack-tight">
-          <div className="row" style={{ flexWrap: "wrap" }}>
-            <strong style={{ fontSize: "var(--text-lg)" }}>{STAGE_LABEL[stage] ?? stage}</strong>
-            {meta && <span className={`chip ${meta.cls}`}>{meta.text}</span>}
-            <span className="mono muted">{stage}</span>
-          </div>
-          {status?.reason ? (
-            <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>
-              {status.reason}
-            </p>
-          ) : (
-            <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>
-              {isModelStage ? "모델을 한 번 부르고, 검증기를 통과해야 저장합니다." : "결정적(코드) 단계입니다. 입력 아티팩트를 읽어 결과를 생성합니다."}
-            </p>
+      <div className="actionbar">
+        <div className="actionbar-state">
+          <strong style={{ fontSize: "var(--text-lg)" }}>{STAGE_LABEL[stage] ?? stage}</strong>
+          {meta && (
+            <span className={`chip ${validationFailed ? "chip--bad" : meta.cls}`}>
+              {validationFailed ? "검증 실패" : meta.text}
+            </span>
           )}
+          <span className="actionbar-msg">{stateMsg}</span>
         </div>
 
-        <div className="stack" style={{ gap: "var(--s-2)", alignItems: "flex-end" }}>
-          <div className="row" style={{ flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
+        <div className="row" style={{ flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
             {perBlock && (() => {
               const pStart = (block - 1) * 4 + 1;
               const pEnd = block * 4;
@@ -374,10 +381,9 @@ export default function StageRunner({  slug,
                 style={{ flex: "0 1 320px", width: 320, minWidth: 180, minHeight: 36, fontSize: "var(--text-sm)" }}
                 aria-label="다시 실행 메모"
               />
-            </div>
-          )}
+              </div>
+            )}
         </div>
-      </div>
 
       {status && stageState(status.state) === "stale" && (
         <Note tone="warn">

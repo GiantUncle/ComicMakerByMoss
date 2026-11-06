@@ -8,20 +8,19 @@ import {
 } from "../api";
 import { CastCardView } from "./CastCards";
 import LayoutPicker, { loadLayoutLibrary, Thumb, type LayoutBox } from "./LayoutPicker";
-import { EmptyState, IssueList, KV, Note, StepSection, Verdict } from "./ui";
+import { EmptyState, IssueList, KV, Note } from "./ui";
 
 /**
- * The review half of a step: what it made, whether that is sound, and what to
- * redo. Every step screen shows all three, in that order — the retake is the
- * last thing on the page, not the only thing.
+ * What you see on a step page is its current state, nothing more:
+ *  - no artifact yet -> empty with the top action's job
+ *  - artifact present -> the artifact, plus the validator's verdict inline
+ *  - artifact invalid -> the failing issues and the same top action to redo
  *
- * The verdict is a script's, not a guess: the same validator the runner forces
- * the model through decides what is listed here.
+ * Failures are the script's, never a guess: the same validator the runner
+ * forces the model through decides what is listed here. Retake controls live
+ * in the sticky top bar (StageRunner); this view does not duplicate them at
+ * the page tail.
  */
-
-const PAGE_SCOPED = new Set(["manga-5-plan", "manga-6-conti", "manga-7-sheets", "manga-8-prompts"]);
-const ID_SCOPED = new Set(["manga-3-bible", "manga-4-refsheets"]);
-const PER_BLOCK = new Set(["manga-6-conti", "manga-7-sheets", "manga-8-prompts"]);
 
 const SPLIT_LABEL: Record<string, string> = {
   even: "순서 · 절차",
@@ -32,17 +31,6 @@ const FOCUS_LABEL: Record<string, string> = {
   person: "사람",
   place: "장면",
   moment: "순간",
-};
-
-const MADE_HINT: Record<string, string> = {
-  "manga-1-source": "이번 화의 소설 본문입니다. 그대로 저장되고 다음 단계가 읽습니다.",
-  "manga-3-bible":
-    "인물 카드 한 장에 외형 앵커 · 시그니처 · 묘사가 들어갑니다. 프로젝트 전체가 함께 씁니다.",
-  "manga-4-refsheets": "인물마다 한 장의 기준 시트 문장입니다. 새 인물만 새로 만듭니다.",
-  "manga-5-plan": "페이지마다 무슨 일을 하는지, 컷 수와 레이아웃(템플릿)을 정합니다.",
-  "manga-6-conti": "AI가 페이지별 콘티(장면·대사·내레이션·효과음, KO/EN/JA)를 작성합니다.",
-  "manga-7-sheets": "콘티를 바탕으로 컷 좌표/시트(sheet.json)를 생성합니다.",
-  "manga-8-prompts": "컷 시트를 최종 이미지 프롬프트(.prompt.txt/.negative.txt)로 컴파일합니다.",
 };
 
 interface PageRow {
@@ -79,7 +67,7 @@ export default function StageReview({
   block,
   refreshToken,
   onRan,
-  onPickCut,
+  onPickCut: _onPickCut,
   selectedPages,
   onTogglePage,
 }: {
@@ -96,23 +84,15 @@ export default function StageReview({
 }) {
   const [review, setReview] = useState<StageReview | null>(null);
   const [pool, setPool] = useState<BiblePool | null>(null);
-  const [pages, setPages] = useState<number[]>([]);
-  const [ids, setIds] = useState<string[]>([]);
-  const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-
-  const pageScoped = PAGE_SCOPED.has(stage);
-  const idScoped = ID_SCOPED.has(stage);
 
   const load = () => {
     api
       .stageReview(slug, stage, ep, block)
       .then((r) => {
         setReview(r);
-        setPages([]);
-        setIds([]);
       })
       .catch((e) => setError(String(e)));
     if (stage === "manga-3-bible") {
@@ -133,8 +113,6 @@ export default function StageReview({
       .then((r) => {
         if (!alive) return;
         setReview(r);
-        setPages([]);
-        setIds([]);
       })
       .catch((e) => alive && setError(String(e)));
     if (stage === "manga-3-bible") {
@@ -148,41 +126,6 @@ export default function StageReview({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, stage, ep, block, refreshToken]);
-
-  async function retake(whole: boolean) {
-    setNote(null);
-    if (!whole && pageScoped && pages.length === 0) {
-      setError("다시 만들 페이지를 고르세요. 전부 다시 만들려면 ‘이 단계 전체 다시’를 누르세요.");
-      return;
-    }
-    if (!whole && idScoped && ids.length === 0) {
-      setError("다시 만들 인물을 고르세요. 전부 다시 만들려면 ‘이 단계 전체 다시’를 누르세요.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await api.retakeStage({
-        slug,
-        stage,
-        episode: ep,
-        block,
-        feedback: (feedback.trim() || (whole ? "전체 다시 실행" : "")),
-        pages: whole ? undefined : pages,
-        ids: whole ? undefined : ids,
-      });
-      setNote(r.note ?? "다시 만들었습니다");
-      setFeedback("");
-      await load();
-      onRan?.();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-
 
   async function saveCard(card: BibleCard) {
     setBusy(true);
@@ -252,49 +195,38 @@ export default function StageReview({
     ? (review.summary.cast as CastRow[])
     : [];
   const cards: BibleCard[] = pool?.characters ?? [];
-  const pickValues: (string | number)[] = pageScoped
-    ? rows.map((r) => r.page)
-    : (cards.length ? cards : castRows).map((c) => c.id);
-
   return (
-    <div className="stack" style={{ gap: "var(--s-6)" }}>
+    <div className="stack" style={{ gap: "var(--s-4)" }}>
       {error && <Note tone="bad">{error}</Note>}
       {note && <Note tone="ok">{note}</Note>}
 
-      {/* ---------------------------------------------- ① what it made -- */}
-      <StepSection n={1} title="현재 결과" hint={MADE_HINT[stage]} accent="made">
-        {review.stale && (
-          <Note tone="warn">
-            {review.stale_reason || "이전 단계가 변경되어 아래 결과는 낡았습니다. 다시 실행하세요."}
-          </Note>
-        )}
-        {!review.exists ? (
-          <EmptyState
-            title={PER_BLOCK.has(stage) ? `이 블록(${(block - 1) * 4 + 1}–${block * 4}p)에 아직 결과가 없습니다.` : "아직 결과가 없습니다."}
-            hint={PER_BLOCK.has(stage)
-              ? `위의 실행 버튼을 누르면 모든 블록을 순서대로 처리합니다. 현재 보고 있는 블록은 ${(block - 1) * 4 + 1}–${block * 4}p 입니다.`
-              : "위의 실행 버튼을 누르면 결과가 만들어집니다."}
-          />
-        ) : stage === "manga-1-source" ? (
-          <>
+      {review.stale && (
+        <Note tone="warn">
+          {review.stale_reason || "이전 단계가 바뀌어 현재 결과는 낡았습니다 — 위 버튼으로 다시 만드세요."}
+        </Note>
+      )}
+
+      {!review.exists ? (
+        <EmptyState
+          title="현재 결과 없음"
+          hint="위 버튼으로 만들기"
+        />
+      ) : (
+        <>
+          <div className="row" style={{ flexWrap: "wrap", alignItems: "center" }}>
             {review.updated_at && (
-              <div className="row" style={{ marginBottom: "var(--s-2)" }}>
-                <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">
-                  현재 반영 · {review.updated_at.replace("T", " ")}
-                </span>
-              </div>
+              <span className="chip">현재 · {review.updated_at.replace("T", " ")}</span>
             )}
+            <span className={"chip " + (review.error_count > 0 ? "chip--bad" : "chip--ok")}>
+              {review.error_count > 0 ? "검증 실패 · 오류 " + review.error_count : "검증 통과"}
+            </span>
+            {review.warning_count > 0 && <span className="chip">경고 {review.warning_count}</span>}
+          </div>
+          <IssueList issues={review.issues} />
+
+          {stage === "manga-1-source" ? (
             <SourceMade review={review} />
-          </>
-        ) : stage === "manga-3-bible" ? (
-          <>
-            {review.updated_at && (
-              <div className="row" style={{ marginBottom: "var(--s-2)" }}>
-                <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">
-                  현재 반영 · {review.updated_at.replace("T", " ")}
-                </span>
-              </div>
-            )}
+          ) : stage === "manga-3-bible" ? (
             <CastMade
               cards={cards.length ? cards : castRowsToCards(castRows)}
               busy={busy}
@@ -303,23 +235,9 @@ export default function StageReview({
               onDelete={deleteCard}
               onRetake={retakeCard}
             />
-          </>
-        ) : stage === "manga-4-refsheets" ? (
-          <>
-            {review.updated_at && (
-              <div className="row" style={{ marginBottom: "var(--s-2)" }}>
-                <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">현재 반영 · {review.updated_at.replace("T", " ")}</span>
-              </div>
-            )}
+          ) : stage === "manga-4-refsheets" ? (
             <SheetsMade cast={castRows} />
-          </>
-        ) : stage === "manga-5-plan" ? (
-          <>
-            {review.updated_at && (
-              <div className="row" style={{ marginBottom: "var(--s-2)" }}>
-                <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">현재 반영 · {review.updated_at.replace("T", " ")}</span>
-              </div>
-            )}
+          ) : stage === "manga-5-plan" ? (
             <PlanMade
               rows={rows}
               pageTotal={review.summary.page_total as number | undefined}
@@ -327,131 +245,35 @@ export default function StageReview({
               onTogglePage={onTogglePage}
               slug={slug}
               ep={ep}
-              onChanged={() => { load(); onRan?.(); }}
+              onChanged={() => {
+                load();
+                onRan?.();
+              }}
             />
-          </>
-        ) : stage === "manga-6-conti" ? (
-          <>
-            {review.updated_at && (
-              <div className="row" style={{ marginBottom: "var(--s-2)" }}>
-                <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">현재 반영 · {review.updated_at.replace("T", " ")}</span>
-              </div>
-            )}
+          ) : stage === "manga-6-conti" ? (
             <ContiBlockView rows={rows} block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
-          </>
-        ) : stage === "manga-7-sheets" ? (
-          <>
-            {review.updated_at && (
-              <div className="row" style={{ marginBottom: "var(--s-2)" }}>
-                <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">현재 반영 · {review.updated_at.replace("T", " ")}</span>
-              </div>
-            )}
+          ) : stage === "manga-7-sheets" ? (
             <BlockMade rows={rows} label="컷 시트" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
-          </>
-        ) : stage === "manga-8-prompts" ? (
-          <>
-            {review.updated_at && (
-              <div className="row" style={{ marginBottom: "var(--s-2)" }}>
-                <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">현재 반영 · {review.updated_at.replace("T", " ")}</span>
-              </div>
-            )}
+          ) : stage === "manga-8-prompts" ? (
             <BlockMade rows={rows} label="프롬프트" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
-          </>
-        ) : (
-          <>
-            {review.updated_at && (
-              <div className="row" style={{ marginBottom: "var(--s-2)" }}>
-                <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">현재 반영 · {review.updated_at.replace("T", " ")}</span>
-              </div>
-            )}
-            <BlockMade rows={rows} label="결과" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
-          </>
-        )}
-      </StepSection>
+          ) : (
+            <BlockMade rows={rows} label="현재 결과" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
+          )}
 
-      {/* ------------------------------------------------- ② is it sound -- */}
-      <StepSection
-        n={2}
-        title="검증 — 정상인지"
-        hint="같은 검증기가 저장 전에도 모델을 다시 부릅니다. 오류가 0이어야 다음 단계로 넘어갑니다."
-      >
-        {!review.exists ? (
-          <EmptyState title="검증할 산출물이 아직 없습니다." hint="①을 먼저 만드세요." />
-        ) : (
-          <Verdict errorCount={review.error_count} warningCount={review.warning_count}>
-            <IssueList issues={review.issues} />
-            {review.files.length > 0 && (
-              <details>
-                <summary className="muted" style={{ fontSize: "var(--text-sm)", cursor: "pointer" }}>
-                  이 단계의 파일 {review.files.length}개
-                </summary>
-                <ul className="mono" style={{ fontSize: "var(--text-sm)", margin: "var(--s-2) 0 0" }}>
-                  {review.files.map((f) => (
-                    <li key={f}>{f}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </Verdict>
-        )}
-      </StepSection>
-
-      {/* --------------------------------------------------- ③ what to do -- */}
-      <StepSection
-        n={3}
-        title={onTogglePage ? "다시 실행" : "다시 만들기 — 일부 선택"}
-        hint={onTogglePage ? "카드를 눌러 페이지를 선택하고, 위의 ‘선택한 페이지만 다시’ 또는 ‘이 단계 다시 실행’을 사용하세요." : "고른 범위만 다시 만들고 나머지는 그대로 둡니다."}
-      >
-        {!review.exists ? (
-          <EmptyState title="다시 만들 것이 아직 없습니다." hint="①을 먼저 만드세요." />
-        ) : (
-          <div className="stack">
-            {!onTogglePage && (pageScoped || idScoped) && (
-              <div className="stack-tight">
-                <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-                  {pageScoped ? "다시 만들 페이지" : "다시 만들 인물"} — 누르면 선택됩니다
-                </span>
-                <div className="pick">
-                  {pickValues.map((v) => (
-                    <button
-                      key={String(v)}
-                      className="btn pick-item"
-                      aria-pressed={pageScoped ? pages.includes(Number(v)) : ids.includes(String(v))}
-                      onClick={() =>
-                        pageScoped
-                          ? setPages((pr) => pr.includes(Number(v)) ? pr.filter((x) => x !== Number(v)) : [...pr, Number(v)])
-                          : setIds((pr) => pr.includes(String(v)) ? pr.filter((x) => x !== String(v)) : [...pr, String(v)])
-                      }
-                    >
-                      {pageScoped ? `${v}p` : String(v)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {!onTogglePage && (pageScoped || idScoped) && (
-              <>
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label htmlFor={`fb-${stage}`}>바꾸고 싶은 점 — 메모 (비워도 됩니다)</label>
-                  <textarea id={`fb-${stage}`} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="예: 2페이지 대사를 더 짧게." spellCheck={false} style={{ minHeight: 72 }} />
-                </div>
-                <div className="row" style={{ flexWrap: "wrap" }}>
-                  <button className="btn btn--primary" onClick={() => retake(false)} disabled={busy}>
-                    고른 {pageScoped ? "페이지" : "인물"} 다시{(pageScoped ? pages.length : ids.length) > 0 ? ` (${pageScoped ? pages.length : ids.length})` : ""}
-                  </button>
-                  {busy && <span className="muted">실행 중…</span>}
-                </div>
-              </>
-            )}
-            {stage === "manga-6-conti" && onPickCut && (
-              <p className="muted" style={{ fontSize: "var(--text-sm)", margin: 0 }}>
-                한 컷만 고치고 싶으면 원고 미리보기에서 그 컷을 누르세요 —{" "}
-                <button className="btn" style={{ minHeight: 26, fontSize: "var(--text-sm)" }} onClick={() => onPickCut(1)}>원고 미리보기 열기</button>
-              </p>
-            )}
-            </div>
-        )}
-      </StepSection>
+          {review.files.length > 0 && (
+            <details>
+              <summary className="muted" style={{ fontSize: "var(--text-sm)", cursor: "pointer" }}>
+                현재 파일 {review.files.length}개
+              </summary>
+              <ul className="mono" style={{ fontSize: "var(--text-sm)", margin: "var(--s-2) 0 0" }}>
+                {review.files.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
+      )}
     </div>
   );
 }
