@@ -145,6 +145,10 @@ export default function StageRunner({  slug,
         dry: false,
         ...(isPlan ? { episode_pages: planPages } : {}),
       });
+      if (stage === "manga-6-conti") {
+        await api.runStage({ slug, stage: "manga-7-sheets", episode: ep, block: perBlock ? block : 1, dry: false });
+        await api.runStage({ slug, stage: "manga-8-prompts", episode: ep, block: perBlock ? block : 1, dry: false });
+      }
       setRun(rkey, { busy: false, result: r, dry: null });
       reload();
       setReviewTick((t) => t + 1);
@@ -174,7 +178,13 @@ export default function StageRunner({  slug,
           } else {
             await api.runStage({ slug, stage, episode: ep, block: b, dry: false });
           }
-          items.push({ block: b, pages: blockRange(b), ok: true, note: "완료" });
+          // sheets + prompts are deterministic off the conti — build them
+          // in the same step, do not make the user run them separately.
+          if (stage === "manga-6-conti") {
+            await api.runStage({ slug, stage: "manga-7-sheets", episode: ep, block: b, dry: false });
+            await api.runStage({ slug, stage: "manga-8-prompts", episode: ep, block: b, dry: false });
+          }
+          items.push({ block: b, pages: blockRange(b), ok: true, note: stage === "manga-6-conti" ? "완료 (콘티+시트+프롬프트)" : "완료" });
         } catch (e) {
           items.push({ block: b, pages: blockRange(b), ok: false, error: String(e) });
           setBatch({ running: false, mode, current: b, total, items: [...items] });
@@ -188,7 +198,9 @@ export default function StageRunner({  slug,
         setReviewTick((t) => t + 1);
       }
       setBatch({ running: false, mode, current: total, total, items: [...items] });
-      setRun(runKey(slug, ep, stage, total), { result: { stage, note: `전체 블록 완료 (${total}개, ${total * 4}p 범위 기준)` } as any });
+      setRun(runKey(slug, ep, stage, total), { result: { stage, note: stage === "manga-6-conti"
+        ? `전체 블록 완료 (${total}개) — 콘티·컷 시트·프롬프트까지 자동 생성`
+        : `전체 블록 완료 (${total}개, ${total * 4}p 범위 기준)` } as any });
       setFeedback("");
       setSelectedPages([]);
       reload();
@@ -214,6 +226,10 @@ export default function StageRunner({  slug,
         feedback: feedback.trim() || "전체 다시 실행",
         ...(isPlan ? { episode_pages: planPages } : {}),
       });
+      if (stage === "manga-6-conti") {
+        await api.runStage({ slug, stage: "manga-7-sheets", episode: ep, block: perBlock ? block : 1, dry: false });
+        await api.runStage({ slug, stage: "manga-8-prompts", episode: ep, block: perBlock ? block : 1, dry: false });
+      }
       setRun(rkey, { busy: false, result: { stage, note: r.note ?? "이 단계를 다시 실행했습니다" } });
       setFeedback("");
       setSelectedPages([]);
