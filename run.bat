@@ -24,18 +24,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [1/6] can this machine run it? (a clear answer beats a broken app)...
-python tools\doctor.py
-if errorlevel 1 (
-  echo.
-  echo [X] The checks above must pass before the app will run.
-  echo     Fix what is listed and start run.bat again.
-  echo.
-  pause
-  exit /b 1
-)
-
-echo [2/6] frontend dependencies...
+echo [1/6] frontend dependencies...
 if not exist "app\frontend\node_modules" (
   echo       first run - installing, this takes a minute...
   pushd "app\frontend"
@@ -45,10 +34,21 @@ if not exist "app\frontend\node_modules" (
   echo       already installed
 )
 
-echo [3/6] backend dependencies...
+echo [2/6] backend dependencies...
 python -c "import fastapi, uvicorn, httpx" >nul 2>nul
 if errorlevel 1 (
   python -m pip install -r "app\backend\requirements.txt"
+)
+
+echo [3/6] can this machine run it? (a clear answer beats a broken app)...
+python tools\doctor.py
+if errorlevel 1 (
+  echo.
+  echo [X] The checks above must pass before the app will run.
+  echo     Fix what is listed and start run.bat again.
+  echo.
+  pause
+  exit /b 1
 )
 
 echo [4/6] freeing ports 8000 / 5173 (avoid duplicate servers)...
