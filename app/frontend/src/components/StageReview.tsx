@@ -7,7 +7,7 @@ import {
   type StageReview,
 } from "../api";
 import { CastCardView } from "./CastCards";
-import { loadLayoutLibrary, Thumb, type LayoutBox } from "./LayoutPicker";
+import LayoutPicker, { loadLayoutLibrary, Thumb, type LayoutBox } from "./LayoutPicker";
 import { EmptyState, IssueList, KV, Note, StepSection, Verdict } from "./ui";
 
 /**
@@ -19,8 +19,9 @@ import { EmptyState, IssueList, KV, Note, StepSection, Verdict } from "./ui";
  * the model through decides what is listed here.
  */
 
-const PAGE_SCOPED = new Set(["manga-5-plan", "manga-6-conti", "manga-7-pages"]);
+const PAGE_SCOPED = new Set(["manga-5-plan", "manga-6-conti", "manga-7-sheets", "manga-8-prompts"]);
 const ID_SCOPED = new Set(["manga-3-bible", "manga-4-refsheets"]);
+const PER_BLOCK = new Set(["manga-6-conti", "manga-7-sheets", "manga-8-prompts"]);
 
 const SPLIT_LABEL: Record<string, string> = {
   even: "순서 · 절차",
@@ -38,10 +39,10 @@ const MADE_HINT: Record<string, string> = {
   "manga-3-bible":
     "인물 카드 한 장에 외형 앵커 · 시그니처 · 묘사가 들어갑니다. 프로젝트 전체가 함께 씁니다.",
   "manga-4-refsheets": "인물마다 한 장의 기준 시트 문장입니다. 새 인물만 새로 만듭니다.",
-  "manga-5-plan": "페이지마다 무슨 일을 하는지, 컷을 몇 개로 할지가 정해집니다.",
-  "manga-6-conti":
-    "페이지마다 컷 구성 · 말풍선 · 내레이션 · 효과음 · 좌표가 3언어로 적혀 있습니다.",
-  "manga-7-pages": "컷 시트와 컴파일된 프롬프트입니다. 좌표는 해상도에 물려 있습니다.",
+  "manga-5-plan": "페이지마다 무슨 일을 하는지, 컷 수와 레이아웃(템플릿)을 정합니다.",
+  "manga-6-conti": "AI가 페이지별 콘티(장면·대사·내레이션·효과음, KO/EN/JA)를 작성합니다.",
+  "manga-7-sheets": "콘티를 바탕으로 컷 좌표/시트(sheet.json)를 생성합니다.",
+  "manga-8-prompts": "컷 시트를 최종 이미지 프롬프트(.prompt.txt/.negative.txt)로 컴파일합니다.",
 };
 
 interface PageRow {
@@ -56,6 +57,7 @@ interface PageRow {
   texts?: number;
   width?: number;
   height?: number;
+  conti?: any;
 }
 
 interface CastRow {
@@ -122,10 +124,28 @@ export default function StageReview({
   };
 
   useEffect(() => {
+    let alive = true;
     setError(null);
     setNote(null);
     setReview(null);
-    load();
+    api
+      .stageReview(slug, stage, ep, block)
+      .then((r) => {
+        if (!alive) return;
+        setReview(r);
+        setPages([]);
+        setIds([]);
+      })
+      .catch((e) => alive && setError(String(e)));
+    if (stage === "manga-3-bible") {
+      api
+        .bible(slug)
+        .then((b) => alive && setPool(b.pool))
+        .catch(() => alive && setPool(null));
+    }
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, stage, ep, block, refreshToken]);
 
@@ -242,11 +262,13 @@ export default function StageReview({
       {note && <Note tone="ok">{note}</Note>}
 
       {/* ---------------------------------------------- ① what it made -- */}
-      <StepSection n={1} title="이 단계가 만든 것" hint={MADE_HINT[stage]} accent="made">
+      <StepSection n={1} title="현재 결과" hint={MADE_HINT[stage]} accent="made">
         {!review.exists ? (
           <EmptyState
-            title="아직 만들어진 것이 없습니다."
-            hint="위의 실행 버튼을 누르면 이 단계가 자신의 산출물을 씁니다."
+            title={PER_BLOCK.has(stage) ? `이 블록(${(block - 1) * 4 + 1}–${block * 4}p)에 아직 결과가 없습니다.` : "아직 결과가 없습니다."}
+            hint={PER_BLOCK.has(stage)
+              ? `위의 실행 버튼을 누르면 모든 블록을 순서대로 처리합니다. 현재 보고 있는 블록은 ${(block - 1) * 4 + 1}–${block * 4}p 입니다.`
+              : "위의 실행 버튼을 누르면 결과가 만들어집니다."}
           />
         ) : stage === "manga-1-source" ? (
           <>
@@ -298,6 +320,9 @@ export default function StageReview({
               pageTotal={review.summary.page_total as number | undefined}
               selectedPages={selectedPages}
               onTogglePage={onTogglePage}
+              slug={slug}
+              ep={ep}
+              onChanged={() => { load(); onRan?.(); }}
             />
           </>
         ) : stage === "manga-6-conti" ? (
@@ -307,7 +332,25 @@ export default function StageReview({
                 <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">현재 반영 · {review.updated_at.replace("T", " ")}</span>
               </div>
             )}
-            <BlockMade rows={rows} label="컷 구성과 글자" selectedPages={selectedPages} onTogglePage={onTogglePage} />
+            <ContiBlockView rows={rows} block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
+          </>
+        ) : stage === "manga-7-sheets" ? (
+          <>
+            {review.updated_at && (
+              <div className="row" style={{ marginBottom: "var(--s-2)" }}>
+                <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">현재 반영 · {review.updated_at.replace("T", " ")}</span>
+              </div>
+            )}
+            <BlockMade rows={rows} label="컷 시트" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
+          </>
+        ) : stage === "manga-8-prompts" ? (
+          <>
+            {review.updated_at && (
+              <div className="row" style={{ marginBottom: "var(--s-2)" }}>
+                <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">현재 반영 · {review.updated_at.replace("T", " ")}</span>
+              </div>
+            )}
+            <BlockMade rows={rows} label="프롬프트" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
           </>
         ) : (
           <>
@@ -316,7 +359,7 @@ export default function StageReview({
                 <span className="chip chip--ok" title="현재 화면에 반영된 마지막 결과">현재 반영 · {review.updated_at.replace("T", " ")}</span>
               </div>
             )}
-            <BlockMade rows={rows} label="컷 시트와 프롬프트" selectedPages={selectedPages} onTogglePage={onTogglePage} />
+            <BlockMade rows={rows} label="결과" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
           </>
         )}
       </StepSection>
@@ -513,19 +556,44 @@ function PlanMade({
   pageTotal,
   selectedPages,
   onTogglePage,
+  slug,
+  ep,
+  onChanged,
 }: {
   rows: PageRow[];
   pageTotal?: number;
   selectedPages?: number[];
   onTogglePage?: (page: number) => void;
+  slug?: string;
+  ep?: string | null;
+  onChanged?: () => void;
 }) {
   const [layouts, setLayouts] = useState<Map<string, LayoutBox[]>>(new Map());
+  const [edit, setEdit] = useState<PageRow | null>(null);
+  const [pick, setPick] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     loadLayoutLibrary()
       .then((items) => setLayouts(new Map(items.map((it) => [it.id, it.boxes]))))
       .catch(() => setLayouts(new Map()));
   }, []);
+
+  async function saveLayout() {
+    if (!edit || !slug || !ep || !pick) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.planTemplate({ slug, episode: ep, page: edit.page, template_id: pick });
+      setEdit(null);
+      onChanged?.();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (rows.length === 0) {
     return <EmptyState title="계획이 비어 있습니다." hint="실행 버튼을 누르면 소설이 페이지로 쪼개집니다." />;
@@ -534,7 +602,7 @@ function PlanMade({
     <div className="stack-tight">
       {pageTotal != null && (
         <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-          전체 {pageTotal}페이지 · 아래는 그중 {rows.length}쪽
+          전체 {pageTotal}페이지 · 아래는 그중 {rows.length}쪽. 카드 선택은 다시 실행용, ‘레이아웃’ 버튼으로 컷 분할을 바꿀 수 있습니다.
         </span>
       )}
       <div className="plan-grid">
@@ -551,7 +619,20 @@ function PlanMade({
             >
               <div className="plan-card-head">
                 <span className="plan-card-page mono">{r.page}p</span>
-                {r.panel_target != null && <span className="chip">컷 {r.panel_target}</span>}
+                <span className="row" style={{ gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  {r.panel_target != null && <span className="chip">컷 {r.panel_target}</span>}
+                  {slug && ep && (
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ minHeight: 26, fontSize: "var(--text-sm)", padding: "0 8px" }}
+                      onClick={(e) => { e.stopPropagation(); setEdit(r); setPick(r.template_suggestion || ""); setErr(null); }}
+                      title="이 페이지의 컷 분할 레이아웃을 시각적으로 선택"
+                    >
+                      레이아웃
+                    </button>
+                  )}
+                </span>
               </div>
               <div className="plan-card-body">
                 <div className="plan-card-thumb">
@@ -584,18 +665,58 @@ function PlanMade({
           );
         })}
       </div>
+
+      {edit && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${edit.page}페이지 레이아웃 선택`}
+          style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "var(--s-4)" }}
+          onClick={(e) => { if (e.target === e.currentTarget && !busy) setEdit(null); }}
+        >
+          <div className="card" style={{ width: "min(980px, 96vw)", maxHeight: "88vh", overflow: "auto", display: "flex", flexDirection: "column", gap: "var(--s-3)" }}>
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--s-2)", flexWrap: "wrap" }}>
+              <strong style={{ fontSize: "var(--text-lg)" }}>{edit.page}p — 컷 분할 레이아웃 선택</strong>
+              <button type="button" className="btn" onClick={() => setEdit(null)} disabled={busy}>닫기</button>
+            </div>
+            <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>
+              컷 {edit.panel_target ?? "?"}개 · {SPLIT_LABEL[edit.split || ""] ?? edit.split ?? "—"} 페이지에 맞는 레이아웃만 표시됩니다. 선택 후 저장하면 계획의 template_suggestion이 바뀝니다.
+            </p>
+            {err && <div className="card chip--bad" style={{ padding: "var(--s-2)" }}>{err}</div>}
+            <LayoutPicker
+              split={(edit.split === "single" ? "single" : "even") as "even" | "single"}
+              panels={Math.max(1, Number(edit.panel_target || 4))}
+              value={pick}
+              onPick={setPick}
+            />
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--s-2)" }}>
+              <span className="mono muted" style={{ fontSize: "var(--text-sm)" }}>선택: {pick || "—"}</span>
+              <div className="row" style={{ gap: "var(--s-2)" }}>
+                <button type="button" className="btn" onClick={() => setEdit(null)} disabled={busy}>취소</button>
+                <button type="button" className="btn btn--primary" onClick={saveLayout} disabled={busy || !pick || pick === edit.template_suggestion}>
+                  {busy ? "저장 중…" : "레이아웃 저장"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function BlockMade({
+
+
+const KIND_KO: Record<string, string> = { dialogue: "대사", narration: "내레이션", sfx: "효과음", caption: "캡션" };
+
+function ContiBlockView({
   rows,
-  label,
+  block,
   selectedPages,
   onTogglePage,
 }: {
   rows: PageRow[];
-  label: string;
+  block: number;
   selectedPages?: number[];
   onTogglePage?: (page: number) => void;
 }) {
@@ -609,7 +730,126 @@ function BlockMade({
 
   if (rows.length === 0) {
     return (
-      <EmptyState title="이 블록에 만들어진 페이지가 없습니다." hint="실행 버튼을 누르면 이 블록(4페이지)을 만듭니다." />
+      <EmptyState
+        title={`이 블록(${(block - 1) * 4 + 1}–${block * 4}p)에 아직 콘티가 없습니다.`}
+        hint={`위의 실행 버튼을 누르면 이 블록(${(block - 1) * 4 + 1}–${block * 4}p)만 AI로 콘티(장면·대사·내레이션·효과음, KO/EN/JA)를 작성합니다.`}
+      />
+    );
+  }
+  return (
+    <div className="stack" style={{ gap: "var(--s-3)" }}>
+      <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
+        콘티 — 블록 {block} ({(block - 1) * 4 + 1}–{block * 4}p). 카드를 눌러 선택, 펼쳐서 실제 콘티 내용을 확인하세요.
+      </span>
+      {rows.map((r) => {
+        const split = r.split;
+        const boxes = r.template_suggestion ? layouts.get(r.template_suggestion) : undefined;
+        const conti = r.conti;
+        const panels: any[] = Array.isArray(conti?.panels) ? conti.panels : [];
+        const texts: any[] = Array.isArray(conti?.texts) ? conti.texts : [];
+        return (
+          <article
+            key={r.page}
+            className="card"
+            style={{
+              padding: "var(--s-3)",
+              cursor: onTogglePage ? "pointer" : undefined,
+              outline: onTogglePage && selectedPages?.includes(r.page) ? "2px solid var(--primary)" : undefined,
+              outlineOffset: 1,
+            }}
+          >
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--s-2)", flexWrap: "wrap" }} onClick={onTogglePage ? () => onTogglePage(r.page) : undefined}>
+              <div className="row" style={{ gap: "var(--s-2)", alignItems: "center", flexWrap: "wrap" }}>
+                <span className="plan-card-page mono">{r.page}p</span>
+                <span className="chip">컷 {r.panels ?? panels.length}</span>
+                <span className="chip">텍스트 {r.texts ?? texts.length}</span>
+                {split && <span className="chip">{SPLIT_LABEL[split] ?? split}</span>}
+                {r.template_suggestion && <span className="chip mono">{r.template_suggestion}</span>}
+              </div>
+              {boxes && <div style={{ width: 64 }}><Thumb boxes={boxes} /></div>}
+            </div>
+            {r.story_job && <p style={{ margin: "var(--s-2) 0 0", fontSize: "var(--text-sm)" }}><strong>장면:</strong> {r.story_job}</p>}
+            <details style={{ marginTop: "var(--s-2)" }} onClick={(e) => e.stopPropagation()}>
+              <summary style={{ cursor: "pointer", fontSize: "var(--text-sm)", fontWeight: 600 }}>콘티 내용 보기 (컷/대사/내레이션/효과음)</summary>
+              <div className="stack" style={{ gap: "var(--s-3)", marginTop: "var(--s-2)" }}>
+                {panels.length > 0 && (
+                  <div>
+                    <div className="muted" style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: 4 }}>컷</div>
+                    <div className="rows">
+                      {panels.map((p: any) => (
+                        <div key={p.n} className="card" style={{ padding: "8px 10px", fontSize: "var(--text-sm)" }}>
+                          <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+                            <span className="chip mono">#{p.n}</span>
+                            {p.shot && <span className="chip">{p.shot}</span>}
+                            {p.anchor_of && <span className="chip" title="앵커">앵커: {p.anchor_of}</span>}
+                            {Array.isArray(p.characters) && p.characters.length > 0 && <span className="muted">등장: {p.characters.join(", ")}</span>}
+                          </div>
+                          {p.beat && <div>{p.beat}</div>}
+                          {p.bg && <div className="muted" style={{ fontSize: "11px" }}>bg: {p.bg}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {texts.length > 0 && (
+                  <div>
+                    <div className="muted" style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: 4 }}>텍스트 (대사/내레이션/효과음)</div>
+                    <div className="rows">
+                      {texts.map((tx: any) => {
+                        const ko = Array.isArray(tx.lines?.ko) ? tx.lines.ko.join(" / ") : "";
+                        const en = Array.isArray(tx.lines?.en) ? tx.lines.en.join(" / ") : "";
+                        const ja = Array.isArray(tx.lines?.ja) ? tx.lines.ja.join(" / ") : "";
+                        return (
+                          <div key={tx.id || Math.random()} className="card" style={{ padding: "8px 10px", fontSize: "var(--text-sm)" }}>
+                            <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+                              <span className="chip">{KIND_KO[tx.kind] ?? tx.kind ?? "텍스트"}</span>
+                              {tx.panel_ref != null && <span className="chip mono">컷 {tx.panel_ref}</span>}
+                              {tx.speaker && <span className="chip">{tx.speaker}</span>}
+                              {tx.id && <span className="mono muted" style={{ fontSize: 11 }}>{tx.id}</span>}
+                            </div>
+                            {ko && <div><span className="muted">KO</span> {ko}</div>}
+                            {en && <div><span className="muted">EN</span> {en}</div>}
+                            {ja && <div><span className="muted">JA</span> {ja}</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {!conti && <p className="muted" style={{ fontSize: "var(--text-sm)", margin: 0 }}>콘티 상세 데이터가 없습니다(새로고침 또는 다시 실행 후 확인).</p>}
+              </div>
+            </details>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function BlockMade({
+  rows,
+  label,
+  block,
+  selectedPages,
+  onTogglePage,
+}: {
+  rows: PageRow[];
+  label: string;
+  block: number;
+  selectedPages?: number[];
+  onTogglePage?: (page: number) => void;
+}) {
+  const [layouts, setLayouts] = useState<Map<string, LayoutBox[]>>(new Map());
+
+  useEffect(() => {
+    loadLayoutLibrary()
+      .then((items) => setLayouts(new Map(items.map((it) => [it.id, it.boxes]))))
+      .catch(() => setLayouts(new Map()));
+  }, []);
+
+  if (rows.length === 0) {
+    return (
+      <EmptyState title={`이 블록(${(block - 1) * 4 + 1}–${block * 4}p)에 아직 결과가 없습니다.`} hint={`위의 실행 버튼으로 모든 블록을 순서대로 처리할 수 있습니다. 현재 보고 있는 블록은 ${(block - 1) * 4 + 1}–${block * 4}p 입니다.`} />
     );
   }
   return (

@@ -61,7 +61,7 @@ export default function Workbench({
         setTemplateId(r.layout.template_id ?? "");
         setPanelCount(r.panel_count);
         setSplit(r.split === "single" ? "single" : "even");
-        setHistory(h.filter((s) => s.stage === "manga-6-conti" || s.stage === "manga-7-pages"));
+        setHistory(h.filter((s) => s.stage === "manga-6-conti" || s.stage === "manga-7-sheets" || s.stage === "manga-8-prompts"));
       })
       .catch((e) => setError(String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps

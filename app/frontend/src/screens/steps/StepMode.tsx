@@ -47,6 +47,7 @@ interface Draft {
   cut_mode: string;
   detail_panels: boolean;
   story_focus: string;
+  episode_pages: number;
 }
 
 const EMPTY: Draft = {
@@ -61,6 +62,7 @@ const EMPTY: Draft = {
   cut_mode: "balanced",
   detail_panels: false,
   story_focus: "balanced",
+  episode_pages: 12,
 };
 
 const slugify = (s: string) =>
@@ -227,6 +229,7 @@ export default function StepMode({
                     cut_mode: draft.cut_mode,
                     detail_panels: draft.detail_panels,
                     story_focus: draft.story_focus,
+                    episode_pages: draft.episode_pages,
                   })
                 }
               >

@@ -1,12 +1,14 @@
 /**
- * The steps of one project, in order (step 1 "모드" removed from the visible flow).
+ * The steps of one project, in order.
  *
  * 1 스토리 (episode)
  * 2 프로젝트 설정 (project)
  * 3 캐스트 (project)
  * 4 레퍼런스 시트 (project)
  * 5 페이지 계획 (episode)
- * 6 컷 · 프롬프트 (episode)
+ * 6 콘티 (episode)      — AI: 장면·대사·내레이션·효과음(KO/EN/JA)
+ * 7 컷 시트 (episode)   — 결정적: 좌표/시트 생성
+ * 8 프롬프트 (episode)  — 결정적: 최종 프롬프트 컴파일 (+ 미리보기/워크벤치)
  *
  * Internal creation state may still use step 1 in the wizard when no project exists.
  */
@@ -63,11 +65,24 @@ export const STEPS: StepMeta[] = [
   },
   {
     n: 6,
-    label: "컷 · 프롬프트",
+    label: "콘티",
     scope: "episode",
-    blurb:
-      "컷 구성 · 말풍선 · 효과음 · 좌표를 확정하고 프롬프트로 컴파일합니다. 원고 미리보기와 워크벤치도 이 단계 안에 있습니다.",
-    stages: ["manga-6-conti", "manga-7-pages"],
+    blurb: "AI가 각 페이지의 장면·대사·내레이션·효과음(KO/EN/JA)을 콘티로 작성합니다.",
+    stages: ["manga-6-conti"],
+  },
+  {
+    n: 7,
+    label: "컷 시트",
+    scope: "episode",
+    blurb: "콘티를 바탕으로 컷 좌표와 시트를 결정적으로 생성합니다.",
+    stages: ["manga-7-sheets"],
+  },
+  {
+    n: 8,
+    label: "프롬프트",
+    scope: "episode",
+    blurb: "컷 시트를 최종 프롬프트로 컴파일합니다. 원고 미리보기와 워크벤치도 여기에서 확인합니다.",
+    stages: ["manga-8-prompts"],
   },
 ];
 

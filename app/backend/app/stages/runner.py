@@ -12,8 +12,8 @@ model does not get to stop with overlapping panels or a leaked `ref_id`.
 scoped: rewrite only these pages, only these characters, with the user's note.
 
     model stages     1 source · 3 bible · 5 plan · 6 conti
-    deterministic    4 refsheets · 7 pages      (no model; the tools decide)
-    present          2 project                  (the wizard already wrote it)
+    deterministic    4 refsheets · 7 sheets · 8 prompts   (no model; the tools decide)
+    present          2 project                           (the wizard already wrote it)
 """
 
 from __future__ import annotations
@@ -840,8 +840,8 @@ def _block_from_pages(pages: list[int]) -> int:
     return block_of(min(pages))
 
 
-# ============================================================== stage 7 pages
-def _run_pages(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, ids, cuts, block, episode_pages=None) -> dict:
+# ============================================================ stage 7 sheets
+def _run_sheets(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, ids, cuts, block, episode_pages=None) -> dict:
     project = _read_json(root / "project.json")
     bible = _read_json(root / "bible" / "characters.json", {"characters": [], "objects": []})
     plan = _read_json(root / "episodes" / ep / "plan" / "page-story-plan.json")
@@ -850,41 +850,25 @@ def _run_pages(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, 
     wanted = list(pages) if pages else block_pages(page_total, block)
     characters = {c["id"]: c for c in bible.get("characters", [])}
     lang = project.get("languages", {}).get("default", "ko")
-    style = build.negative_style(project)
 
     pages_dir = root / "episodes" / ep / "pages"
-    prompts_dir = root / "episodes" / ep / "prompts"
     files: list[str] = []
     issues: list[dict] = []
-    contis: list[dict] = []
 
     for n in wanted:
         conti_path = pages_dir / f"page-{n:03d}.conti.json"
         if not conti_path.is_file():
-            raise StageError(f"missing conti for page {n} — run stage 6 first")
+            raise StageError(f"missing conti for page {n} — run stage 6 (콘티) first")
         conti = _read_json(conti_path)
         issues += validate.validate_conti(conti, project)
-        contis.append(conti)
         draft = build.build_page(conti, project, characters, lang)
         draft_issues = validate.validate_draft(draft, project)
         issues += [i for i in draft_issues if i["code"] not in ("page.panel-count",)]
         sheet = pages_dir / f"page-{n:03d}.sheet.json"
-        _write_json(sheet, draft)
-        prompt_text = build.compile_draft(draft)
-        prompt_obj = json.loads(prompt_text[prompt_text.index("{"):])
-        width, height = draft["width"], draft["height"]
-        issues += [i for i in validate.validate_prompt(prompt_obj, width, height, project)
-                   if i["code"] not in ("page.panel-count",)]
-        _write_text(prompts_dir / f"page-{n:03d}.prompt.txt", prompt_text + "\n")
-        _write_text(prompts_dir / f"page-{n:03d}.negative.txt", build.negative(style) + "\n")
-        files += [
-            _rel(root, sheet),
-            _rel(root, prompts_dir / f"page-{n:03d}.prompt.txt"),
-            _rel(root, prompts_dir / f"page-{n:03d}.negative.txt"),
-        ]
+        if not dry:
+            _write_json(sheet, draft)
+        files.append(_rel(root, sheet))
 
-    # a layout belongs to one page of the episode — check the whole episode,
-    # not only the pages this run touched
     every = []
     for conti_path in sorted(pages_dir.glob("page-*.conti.json")):
         try:
@@ -894,13 +878,65 @@ def _run_pages(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, 
     issues += validate.validate_episode(every, project)
 
     errs = validate.errors(issues)
-    return {
-        "note": f"built pages {wanted[0]}..{wanted[-1]}"
+    res = {
+        "note": f"cut sheets {'(dry run) ' if dry else ''}for pages {wanted[0]}..{wanted[-1]}"
                 + ("" if not errs else f" · {len(errs)} error(s)"),
         "warnings": [i["message"] for i in validate.warnings(issues)],
         "files": files,
         "issues": issues,
     }
+    if dry:
+        res["system"] = "결정적 단계(코드 실행)입니다. AI 프롬프트가 없습니다."
+        res["user"] = f"콘티 → 컷 시트 생성\n대상 페이지: {wanted}\n언어 기준: {lang}\n출력: page-NNN.sheet.json"
+    return res
+
+
+# =========================================================== stage 8 prompts
+def _run_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, ids, cuts, block, episode_pages=None) -> dict:
+    project = _read_json(root / "project.json")
+    plan = _read_json(root / "episodes" / ep / "plan" / "page-story-plan.json")
+    page_total = int(plan.get("page_total", len(plan.get("pages", []))))
+    block = _block_from_pages(pages) if pages else block
+    wanted = list(pages) if pages else block_pages(page_total, block)
+    style = build.negative_style(project)
+
+    pages_dir = root / "episodes" / ep / "pages"
+    prompts_dir = root / "episodes" / ep / "prompts"
+    files: list[str] = []
+    issues: list[dict] = []
+
+    for n in wanted:
+        sheet_path = pages_dir / f"page-{n:03d}.sheet.json"
+        if not sheet_path.is_file():
+            raise StageError(f"missing cut sheet for page {n} — run stage 7 (컷 시트) first")
+        draft = _read_json(sheet_path)
+        draft_issues = validate.validate_draft(draft, project)
+        issues += [i for i in draft_issues if i["code"] not in ("page.panel-count",)]
+        prompt_text = build.compile_draft(draft)
+        prompt_obj = json.loads(prompt_text[prompt_text.index("{"):])
+        width, height = draft["width"], draft["height"]
+        issues += [i for i in validate.validate_prompt(prompt_obj, width, height, project)
+                   if i["code"] not in ("page.panel-count",)]
+        if not dry:
+            _write_text(prompts_dir / f"page-{n:03d}.prompt.txt", prompt_text + "\n")
+            _write_text(prompts_dir / f"page-{n:03d}.negative.txt", build.negative(style) + "\n")
+        files += [
+            _rel(root, prompts_dir / f"page-{n:03d}.prompt.txt"),
+            _rel(root, prompts_dir / f"page-{n:03d}.negative.txt"),
+        ]
+
+    errs = validate.errors(issues)
+    res = {
+        "note": f"prompts {'(dry run) ' if dry else ''}compiled for pages {wanted[0]}..{wanted[-1]}"
+                + ("" if not errs else f" · {len(errs)} error(s)"),
+        "warnings": [i["message"] for i in validate.warnings(issues)],
+        "files": files,
+        "issues": issues,
+    }
+    if dry:
+        res["system"] = "결정적 단계(코드 실행)입니다. AI 프롬프트가 없습니다."
+        res["user"] = f"컷 시트 → 최종 프롬프트 컴파일\n대상 페이지: {wanted}\n스타일: {style}\n출력: page-NNN.prompt.txt, page-NNN.negative.txt"
+    return res
 
 
 # ================================================================== dispatch
@@ -910,7 +946,8 @@ _RUNNERS = {
     "manga-4-refsheets": _run_refsheets,
     "manga-5-plan": _run_plan,
     "manga-6-conti": _run_conti,
-    "manga-7-pages": _run_pages,
+    "manga-7-sheets": _run_sheets,
+    "manga-8-prompts": _run_prompts,
 }
 
 
@@ -960,6 +997,59 @@ def run(
 
 
 # -------------------------------------------------------------- retemplate
+def retemplate_plan(slug: str, ep: str, page: int, template_id: str) -> dict:
+    """Set a plan page's layout template (stage 5). Validates uniqueness and panel count fit."""
+    root = _root(slug)
+    project = _read_json(root / "project.json")
+    plan_path = root / "episodes" / ep / "plan" / "page-story-plan.json"
+    if not plan_path.is_file():
+        raise StageError("no page plan yet — run stage 5 first")
+    plan = _read_json(plan_path)
+    pages = plan.get("pages", [])
+    target = next((p for p in pages if int(p.get("page", 0)) == int(page)), None)
+    if not target:
+        raise StageError(f"page {page} not found in plan")
+
+    # uniqueness in episode
+    for p in pages:
+        if int(p.get("page", 0)) == int(page):
+            continue
+        if p.get("template_suggestion") == template_id:
+            raise StageError(f"layout {template_id} is already used on page {p.get('page')} — one layout per page per episode")
+
+    # validate template exists and panel count matches target when possible
+    valid = set(_valid_templates(project))
+    if template_id not in valid:
+        raise StageError(f"unknown or unavailable layout {template_id!r} for this project")
+    try:
+        import importlib
+        # check panel count from moss/tier libraries via build helpers
+        moss = build.moss_layout(template_id)
+        if moss is not None:
+            n = len(moss.get("panels", []))
+        else:
+            tpl = next((t for t in build.library().get("templates", []) if t.get("id") == template_id), None)
+            n = sum(len(tier.get("panels", [])) for tier in (tpl or {}).get("tiers", [])) if tpl else None
+        pt = int(target.get("panel_target", 0) or 0)
+        if n and pt and n != pt:
+            raise StageError(f"layout {template_id} has {n} panels but page {page} targets {pt} panels")
+    except StageError:
+        raise
+    except Exception:
+        pass
+
+    history.snapshot(root, [_rel(root, plan_path)], stage="manga-5-plan",
+                     note=f"template page {page} -> {template_id}", episode=ep)
+    target["template_suggestion"] = template_id
+    plan["pages"] = sorted(pages, key=lambda p: int(p.get("page", 0)))
+    _write_json(plan_path, plan)
+    issues = validate.validate_plan(plan, project)
+    if validate.errors(issues):
+        # rollback? keep simple: re-raise
+        raise StageError("plan validation failed after template change: " + _first_error(issues))
+    return {"ok": True, "page": page, "template_id": template_id, "issues": issues}
+
+
 def retemplate(slug: str, ep: str, page: int, layout: dict) -> dict:
     """Swap a page's layout template, re-validate, and rebuild that page.
 
@@ -1013,11 +1103,14 @@ def retemplate(slug: str, ep: str, page: int, layout: dict) -> dict:
         raise StageError("that template does not fit this page: " + _first_error(issues))
 
     _write_json(path, conti)
-    page_result = run(slug, "manga-7-pages", ep=ep, pages=[page])
+    sheet_result = run(slug, "manga-7-sheets", ep=ep, pages=[page])
+    prompt_result = run(slug, "manga-8-prompts", ep=ep, pages=[page])
     return {
         "conti": {"stage": "manga-6-conti", "note": f"page {page} · template {conti['layout'].get('template_id')}",
                   "files": [_rel(root, path)], "issues": issues},
-        "page": page_result,
+        "sheet": sheet_result,
+        "page": prompt_result,
+        "prompt": prompt_result,
     }
 
 
@@ -1034,7 +1127,9 @@ def _block_done(root: Path, ep: str, stage_id: str, block: int, page_total: int)
     pages = block_pages(page_total, block)
     if stage_id == "manga-6-conti":
         return all((root / "episodes" / ep / "pages" / f"page-{n:03d}.conti.json").is_file() for n in pages)
-    if stage_id == "manga-7-pages":
+    if stage_id == "manga-7-sheets":
+        return all((root / "episodes" / ep / "pages" / f"page-{n:03d}.sheet.json").is_file() for n in pages)
+    if stage_id == "manga-8-prompts":
         return all((root / "episodes" / ep / "prompts" / f"page-{n:03d}.prompt.txt").is_file() for n in pages)
     return False
 
@@ -1130,9 +1225,36 @@ def review(slug: str, stage_id: str, *, ep: str | None = None, block: int = 1) -
     project = _read_json(root / "project.json")
 
     files: list[str] = []
-    for pattern in stage.produces:
-        for path in registry.matches(root, registry.render(pattern, ep)):
-            files.append(_rel(root, path))
+    if stage.per_block and ep:
+        # scope review files/updated_at to the current 4-page block
+        plan = _read_json(root / "episodes" / ep / "plan" / "page-story-plan.json", {"page_total": 0})
+        page_total = int(plan.get("page_total", 0))
+        wanted = block_pages(page_total, block)
+        if stage_id == "manga-6-conti":
+            for n in wanted:
+                p = root / "episodes" / ep / "pages" / f"page-{n:03d}.conti.json"
+                if p.is_file():
+                    files.append(_rel(root, p))
+        elif stage_id == "manga-7-sheets":
+            for n in wanted:
+                p = root / "episodes" / ep / "pages" / f"page-{n:03d}.sheet.json"
+                if p.is_file():
+                    files.append(_rel(root, p))
+        elif stage_id == "manga-8-prompts":
+            for n in wanted:
+                for p in sorted((root / "episodes" / ep / "prompts").glob(f"page-{n:03d}*.prompt.txt")) if (root / "episodes" / ep / "prompts").is_dir() else []:
+                    files.append(_rel(root, p))
+                neg = root / "episodes" / ep / "prompts" / f"page-{n:03d}.negative.txt"
+                if neg.is_file():
+                    files.append(_rel(root, neg))
+        else:
+            for pattern in stage.produces:
+                for path in registry.matches(root, registry.render(pattern, ep, block)):
+                    files.append(_rel(root, path))
+    else:
+        for pattern in stage.produces:
+            for path in registry.matches(root, registry.render(pattern, ep)):
+                files.append(_rel(root, path))
 
     issues: list[dict] = []
     summary: dict[str, Any] = {}
@@ -1189,9 +1311,11 @@ def review(slug: str, stage_id: str, *, ep: str | None = None, block: int = 1) -
             contis.append({"page": n, "panels": len(conti.get("panels", [])),
                            "texts": len(conti.get("texts", [])),
                            "template_suggestion": layout.get("template_id"),
-                           "split": conti.get("split")})
+                           "split": conti.get("split"),
+                           "story_job": conti.get("story_job"),
+                           "conti": conti})
         summary["pages"] = contis
-    elif stage_id == "manga-7-pages" and ep:
+    elif stage_id == "manga-7-sheets" and ep:
         plan = _read_json(root / "episodes" / ep / "plan" / "page-story-plan.json", {"page_total": 0})
         page_total = int(plan.get("page_total", 0))
         pages = []
@@ -1209,6 +1333,27 @@ def review(slug: str, stage_id: str, *, ep: str | None = None, block: int = 1) -
                           "width": draft.get("width"), "height": draft.get("height"),
                           "template_suggestion": layout.get("template_id"),
                           "split": conti.get("split")})
+        summary["pages"] = pages
+    elif stage_id == "manga-8-prompts" and ep:
+        plan = _read_json(root / "episodes" / ep / "plan" / "page-story-plan.json", {"page_total": 0})
+        page_total = int(plan.get("page_total", 0))
+        pages = []
+        for n in block_pages(page_total, block):
+            prompt_path = root / "episodes" / ep / "prompts" / f"page-{n:03d}.prompt.txt"
+            sheet_path = root / "episodes" / ep / "pages" / f"page-{n:03d}.sheet.json"
+            if not prompt_path.is_file():
+                continue
+            draft = _read_json(sheet_path, {}) if sheet_path.is_file() else {}
+            conti_path = root / "episodes" / ep / "pages" / f"page-{n:03d}.conti.json"
+            conti = _read_json(conti_path, {}) if conti_path.is_file() else {}
+            layout = conti.get("layout") or {}
+            row = {"page": n,
+                   "panels": sum(1 for it in draft.get("items", []) if it.get("label") != "text") if draft else None,
+                   "texts": sum(1 for it in draft.get("items", []) if it.get("label") == "text") if draft else None,
+                   "width": draft.get("width"), "height": draft.get("height"),
+                   "template_suggestion": layout.get("template_id"),
+                   "split": conti.get("split")}
+            pages.append(row)
         summary["pages"] = pages
 
     updated_at = None

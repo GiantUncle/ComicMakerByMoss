@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "note": "Manga panel-layout template library. Seeded from the named Japanese koma-wari kata (see references/comic-layout.md). Instantiate with scripts/instantiate_layout.py.",
+
+  "reading_order": {
+    "rtl": "tier ascending, then x_min descending",
+    "ltr": "tier ascending, then x_min ascending"
+  },
+
+  "sizes": {
+    "S":  { "w": 704,  "h": 992,  "margin": 28, "gutter": 10, "mp": 0.70 },
+    "M":  { "w": 992,  "h": 1408, "margin": 40, "gutter": 14, "mp": 1.40 },
+    "L":  { "w": 1248, "h": 1760, "margin": 50, "gutter": 18, "mp": 2.20 },
+    "XL": { "w": 1408, "h": 1984, "margin": 56, "gutter": 20, "mp": 2.79 }
+  },
+
+  "rules": {
+    "panel_count": { "min": 1, "standard": [5, 6], "max": 8, "climax": [1, 3] },
+    "tier_count": { "standard": [3, 4], "max": 4 },
+    "misegoma": { "min_area_vs_second": 2.0, "page_area_share": [0.30, 0.40] },
+    "stagger_min_fraction": 0.08,
+    "margin_min_fraction": 0.02
+  },
+
+  "templates": [
+    {
+      "id": "FULL1",
+      "name_ja": "全面1コマ",
+      "name_en": "full-page splash",
+      "tiers": [{ "weight": 1, "panels": [1] }],
+      "use_for": ["climax", "turn", "establishing"],
+      "note_ja": "前ページの引きが弱いと効果が出ない"
+    },
+    {
+      "id": "T_JI2",
+      "name_ja": "2段割り(大+小)",
+      "name_en": "two-tier, big over small",
+      "tiers": [
+        { "weight": 2, "panels": [1] },
+        { "weight": 1, "panels": [1, 1] }
+      ],
+      "use_for": ["reaction", "climax"],
+      "expects_misegoma": true,
+      "note_ja": "大ゴマに情報を詰めすぎない"
+    },
+    {
+      "id": "DAN3",
+      "name_ja": "3段均等割り",
+      "name_en": "three equal tiers",
+      "tiers": [
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1] }
+      ],
+      "use_for": ["opening", "dialogue"],
+      "note_ja": "全コマが同じ大きさだと強弱が消える"
+    },
+    {
+      "id": "T_JI",
+      "name_ja": "T字",
+      "name_en": "T-shape",
+      "tiers": [
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1, 1] }
+      ],
+      "use_for": ["opening", "reaction"],
+      "note_ja": "上段を横長にしすぎると中身が入らない"
+    },
+    {
+      "id": "DAN4",
+      "name_ja": "4段割り",
+      "name_en": "four tiers",
+      "tiers": [
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1] }
+      ],
+      "use_for": ["dialogue", "tempo"],
+      "note_ja": "1段が薄いと全身が入らない"
+    },
+    {
+      "id": "TA_NOJI",
+      "name_ja": "田の字",
+      "name_en": "2x2 grid",
+      "tiers": [
+        { "weight": 1, "panels": [1, 1] },
+        { "weight": 1, "panels": [1, 1] }
+      ],
+      "use_for": ["parallel"],
+      "t_rule_exempt": "2x2 の十字がそのまま '+' 配置。並列・同時提示専用で、時間順の物語には使わない。使うなら番号か見出しを添える。",
+      "note_ja": "並列すぎて時間の流れが出ない"
+    },
+    {
+      "id": "YONKOMA",
+      "name_ja": "4コマ",
+      "name_en": "4-koma",
+      "tiers": [
+        { "weight": 1, "panels": [1, 1] },
+        { "weight": 1, "panels": [1, 1] }
+      ],
+      "use_for": ["comedy"],
+      "gutter_scale": 1.8,
+      "t_rule_exempt": "田の字と同じ '+' 配置。4コマは右上→左上→右下→左下という慣習で順序が固定されるため例外的に成立する。",
+      "note_ja": "田の字と同じ骨格。太いガターで4コマとして読ませる"
+    },
+    {
+      "id": "T3C",
+      "name_ja": "上段分割→下段インパクト",
+      "name_en": "split top, impact bottom",
+      "tiers": [
+        { "weight": 1, "panels": [1, 1] },
+        { "weight": 1, "panels": [1] },
+        { "weight": 2, "panels": [1] }
+      ],
+      "use_for": ["dialogue", "climax"],
+      "expects_misegoma": true,
+      "note_ja": "下段を大ゴマにする。weightを1:1:1にすると見せゴマが消える"
+    },
+    {
+      "id": "T3B",
+      "name_ja": "下段リアクション2コマ",
+      "name_en": "bottom reaction pair",
+      "tiers": [
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1, 1] }
+      ],
+      "use_for": ["reaction"]
+    },
+    {
+      "id": "T3D",
+      "name_ja": "中段で会話交換",
+      "name_en": "middle exchange",
+      "tiers": [
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1, 1] },
+        { "weight": 1, "panels": [1] }
+      ],
+      "use_for": ["dialogue"]
+    },
+    {
+      "id": "T4B",
+      "name_ja": "テンポの速い会話",
+      "name_en": "fast dialogue, five panels",
+      "tiers": [
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1, 1] },
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1] }
+      ],
+      "use_for": ["dialogue", "tempo"]
+    },
+    {
+      "id": "T4C",
+      "name_ja": "雑談・群像（上限6）",
+      "name_en": "chatter, six panels",
+      "tiers": [
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1.35, 1] },
+        { "weight": 1, "panels": [1, 1.35] },
+        { "weight": 1, "panels": [1] }
+      ],
+      "use_for": ["dialogue", "ensemble"],
+      "note_ja": "分割線が上下で重ならないよう、段ごとにコマ幅をずらしてある（Tルール）"
+    },
+    {
+      "id": "HALF_SPLASH",
+      "name_ja": "半スプラッシュ＋展開",
+      "name_en": "half splash plus development",
+      "tiers": [
+        { "weight": 2, "panels": [1] },
+        { "weight": 1, "panels": [1] },
+        { "weight": 1, "panels": [1, 1] }
+      ],
+      "use_for": ["climax", "opening"],
+      "expects_misegoma": true
+    }
+  ],
+
+  "page_function_defaults": {
+    "opening": ["DAN3", "T_JI"],
+    "dialogue": ["DAN4", "T4B"],
+    "reaction": ["T_JI2", "T3B"],
+    "climax": ["FULL1", "HALF_SPLASH"],
+    "turn": ["FULL1"],
+    "comedy": ["YONKOMA"],
+    "parallel": ["TA_NOJI"]
+  }
+}

@@ -63,7 +63,13 @@ STAGES: tuple[Stage, ...] = (
         craft=("comic-planning.md", "character-consistency.md"),
     ),
     Stage(
-        id="manga-7-pages", n=7, scope="episode", mode="deterministic", per_block=True,
+        id="manga-7-sheets", n=7, scope="episode", mode="deterministic", per_block=True,
+        produces=("episodes/{ep}/pages/page-{block}*.sheet.json",),
+        gate=None,
+        requires=("episodes/{ep}/plan/APPROVED",),
+    ),
+    Stage(
+        id="manga-8-prompts", n=8, scope="episode", mode="deterministic", per_block=True,
         produces=("episodes/{ep}/prompts/page-{block}*.prompt.txt",),
         gate=None,
         requires=("episodes/{ep}/plan/APPROVED",),
@@ -145,9 +151,9 @@ def status_for(root: Path, project: dict, ep: str | None, episode: dict | None) 
             out.append(StageStatus(stage.id, stage.n, stage.scope, stage.mode,
                                    "unavailable", "illustration 은 4단계에서 끝납니다", stage.gate))
             continue
-        if mode == "comic" and stage.n == 7:
+        if mode == "comic" and stage.n >= 6:
             out.append(StageStatus(stage.id, stage.n, stage.scope, stage.mode,
-                                   "unavailable", "comic 은 한 장이라 7단계가 없습니다", stage.gate))
+                                   "unavailable", "comic 은 5단계에서 끝납니다", stage.gate))
             continue
 
         done = is_done(root, stage, ep)

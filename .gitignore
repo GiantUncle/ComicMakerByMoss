@@ -18,10 +18,14 @@ build/
 # App-generated / user project data
 projects/
 
+# The skill library is SHIPPED CODE, not local state. .opencode/skills must be
+# committed or a fresh clone cannot load a single layout; the __pycache__/ rule
+# above already keeps its caches out.
+!.opencode/skills/
+
 # Local scratch & root test outputs (not part of the repo)
 scratch/
 _local/
-.opencode/
 /*.png
 /*.jpg
 /*.jpeg

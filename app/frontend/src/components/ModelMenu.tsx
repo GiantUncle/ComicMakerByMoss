@@ -7,7 +7,14 @@ import { api, type ModelCatalog, type ModelGroup } from "../api";
  * provider a model is used from. The star moves a model into the favourites
  * block; pressing it again releases it. Refresh re-reads the provider's list.
  */
-export default function ModelMenu({ onChanged }: { onChanged?: () => void }) {
+export default function ModelMenu({
+  onChanged,
+  onProviders,
+}: {
+  onChanged?: () => void;
+  /** jumps to the provider screen — keys live there, not here */
+  onProviders?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState<ModelCatalog | null>(null);
   const [busy, setBusy] = useState(false);
@@ -133,6 +140,28 @@ export default function ModelMenu({ onChanged }: { onChanged?: () => void }) {
               </button>
             </div>
           </div>
+
+          {/* keys and endpoints are set on the provider screen, not here */}
+          {onProviders && (
+            <button
+              className="btn"
+              style={{
+                width: "100%",
+                justifyContent: "flex-start",
+                gap: "var(--s-2)",
+                borderRadius: 0,
+                border: 0,
+                borderBottom: "1px solid var(--border)",
+              }}
+              onClick={() => {
+                setOpen(false);
+                onProviders();
+              }}
+            >
+              <span aria-hidden>⚙️</span>
+              프로바이더 설정 — API 키 · 엔드포인트
+            </button>
+          )}
 
           {error && (
             <div className="chip--bad" style={{ padding: "var(--s-2) var(--s-3)", fontSize: "var(--text-sm)" }}>

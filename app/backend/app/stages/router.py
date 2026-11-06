@@ -97,14 +97,15 @@ class RetakeCutIn(BaseModel):
 
 @router.post("/retake-cut")
 def retake_cut(body: RetakeCutIn) -> dict:
-    """Retake one cut: rewrite that panel's conti, then rebuild that page."""
+    """Retake one cut: rewrite that panel's conti, then rebuild sheet+prompt for that page."""
     try:
         conti = runner.run(
             body.slug, "manga-6-conti", ep=body.episode,
             cuts=[{"page": body.page, "n": body.panel}], feedback=body.feedback or None,
         )
-        pages = runner.run(body.slug, "manga-7-pages", ep=body.episode, pages=[body.page])
-        return {"conti": conti, "page": pages}
+        sheet = runner.run(body.slug, "manga-7-sheets", ep=body.episode, pages=[body.page])
+        pages = runner.run(body.slug, "manga-8-prompts", ep=body.episode, pages=[body.page])
+        return {"conti": conti, "sheet": sheet, "page": pages}
     except runner.StageError as e:
         raise HTTPException(409, str(e))
     except ProviderError as e:
@@ -129,11 +130,27 @@ def retemplate(body: RetemplateIn) -> dict:
         raise HTTPException(503, str(e))
 
 
+class PlanTemplateIn(BaseModel):
+    slug: str
+    episode: str
+    page: int
+    template_id: str
+
+
+@router.post("/plan-template")
+def plan_template(body: PlanTemplateIn) -> dict:
+    """Set a page's layout template in the episode plan (stage 5)."""
+    try:
+        return runner.retemplate_plan(body.slug, body.episode, body.page, body.template_id)
+    except runner.StageError as e:
+        raise HTTPException(409, str(e))
+
+
 class OrchestrateIn(BaseModel):
     slug: str
     episode: str | None = None
     from_n: int = 1
-    to_n: int = 7
+    to_n: int = 8
 
 
 @router.post("/orchestrate")

@@ -13,12 +13,9 @@ import Workbench from "./Workbench";
 /**
  * The step screen.
  *
- * One step at a time, chosen from the left rail, so any step is reachable again
- * — there is no one-way door. Steps 1-3 are forms that write the project's own
- * files; steps 4-7 are pipeline stages, so they are the stage runner with its
- * three sections: what it made, whether that is sound, what to redo. Step 7
- * carries the manuscript preview and the workbench as tabs inside it, because
- * they belong to that step and nowhere else.
+ * One step at a time, chosen from the left rail. Steps 1-2 are forms; 3-5,6,7
+ * are single pipeline stages; step 8 compiles prompts and hosts preview/workbench.
+ * Pipeline: 콘티(6, AI) → 컷 시트(7) → 프롬프트(8).
  */
 
 function readWizardUrl() {
@@ -58,8 +55,7 @@ export default function Wizard({
   const [stages, setStages] = useState<StageStatus[]>([]);
   const [ep, setEp] = useState<string | null>(init.ep);
   type Tab = "make" | "preview" | "bench";
-  const isTab = (v: string): v is Tab => v === "make" || v === "preview" || v === "bench";
-  const [tab, setTab] = useState<Tab>(isTab(init.tab) ? init.tab : "make");
+  const [tab, setTab] = useState<Tab>(init.tab as Tab);
   const [page, setPage] = useState(init.page);
   const [block, setBlock] = useState(init.block);
   const [tier, setTier] = useState(init.tier);
@@ -80,8 +76,6 @@ export default function Wizard({
       return;
     }
     let alive = true;
-    // the list endpoint enriches each episode with its page count and gates;
-    // the single-project endpoint returns ids only
     api
       .projects()
       .then((all) => {
@@ -105,20 +99,17 @@ export default function Wizard({
       .catch(() => setStages([]));
   }, [slug, ep, step]);
 
-  // the open episode is the newest one; switching projects resets it
   useEffect(() => {
-    if (!project) return; // wait for project load so URL-restored ep isn't wiped
+    if (!project) return;
     if (!hasEpisode(project, ep)) setEp(openEpisodeId(project));
   }, [project, ep]);
 
-  // migrate legacy/hidden step numbers: old 1(mode)->2(settings), old 7->6 etc handled by direct use; step 1 now means story
   useEffect(() => {
     if (!slug || !project) return;
-    // legacy step 7 (old cut/prompt) -> 6
-    if (step === 7) onStep(6);
+    // legacy: old step 7 was combined cut/prompt; now prompts is step 8
+    if (step > 8) onStep(8);
   }, [slug, project, step, onStep]);
 
-  // the view tier follows the project until the user picks another size (unless URL specified)
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get("tier");
     if (fromUrl) return;
@@ -129,10 +120,10 @@ export default function Wizard({
     if (!slug) return;
     const q = new URLSearchParams(window.location.search);
     if (ep) q.set("ep", ep); else q.delete("ep");
-    if (step === 6) q.set("tab", tab); else q.delete("tab");
-    if (step === 6) q.set("page", String(Math.max(1, page))); else q.delete("page");
-    if (step >= 3 && step <= 6) q.set("block", String(Math.max(1, block))); else q.delete("block");
-    if (step === 6) q.set("tier", tier); else q.delete("tier");
+    if (step === 8) q.set("tab", tab); else q.delete("tab");
+    if (step === 8) q.set("page", String(Math.max(1, page))); else q.delete("page");
+    if (step >= 3 && step <= 8) q.set("block", String(Math.max(1, block))); else q.delete("block");
+    if (step === 8) q.set("tier", tier); else q.delete("tier");
     const next = `${window.location.pathname}${q.toString() ? `?${q.toString()}` : ""}${window.location.hash}`;
     const cur = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (next !== cur) window.history.replaceState(null, "", next);
@@ -147,7 +138,8 @@ export default function Wizard({
     setError(null);
     setNote(null);
     if (!slug) return;
-    api.project(slug).then(setProject).catch((e) => setError(String(e)));
+    api.projects().then((all) => setProject(all.find((x) => x.slug === slug) ?? null)).catch((e) => setError(String(e)));
+    if (ep) api.stages(slug, ep).then(setStages).catch(() => {});
   }
 
   async function createProject(body: Parameters<typeof api.createProject>[0]) {
@@ -184,6 +176,33 @@ export default function Wizard({
 
   const meta = stepMeta(step);
 
+  function renderStage(stageId: string, extra?: { onPickCut?: (p: number) => void }) {
+    const st = stages.find((s) => s.id === stageId);
+    if (st && stageState(st.state) === "skip") {
+      return (
+        <div className="card stack-tight">
+          <strong>{stageId}</strong>
+          <span className="muted" style={{ fontSize: "var(--text-sm)" }}>{st.reason}</span>
+        </div>
+      );
+    }
+    return (
+      <StageRunner
+        key={stageId}
+        slug={slug!}
+        ep={ep}
+        stage={stageId}
+        block={block}
+        blocks={blocks}
+        onBlock={setBlock}
+            episodePages={(project as any)?.episode_pages ?? 12}
+        onRan={refresh}
+        onProviders={onProviders}
+        onPickCut={extra?.onPickCut ?? ((p) => { setPage(p); setTab("preview"); onStep(8); })}
+      />
+    );
+  }
+
   return (
     <div className="wrap">
       {meta && (
@@ -199,7 +218,6 @@ export default function Wizard({
       {error && <Note tone="bad">{error}</Note>}
       {note && <Note tone="ok">{note}</Note>}
 
-      {/* no project yet: only step 1 can be on screen, so any step opens it */}
       {(!slug || !project) && (
         <StepMode
           project={null}
@@ -210,9 +228,6 @@ export default function Wizard({
           onSave={patchProject}
         />
       )}
-
-      {/* ------------------------------------------------------------ steps */}
-      {null}
 
       {slug && project && step === 1 && (
         <StepStory
@@ -238,27 +253,20 @@ export default function Wizard({
         />
       )}
 
-      {slug && project && (step === 3 || step === 4 || step === 5) && (
-        <StageRunner
-          slug={slug}
-          ep={ep}
-          stage={stepMeta(step)!.stages[0]}
-          block={block}
-          blocks={blocks}
-          onBlock={setBlock}
-          tier={tier}
-          episodePages={(project as any).episode_pages ?? 12}
-          onRan={refresh}
-          onProviders={onProviders}
-        />
-      )}
+      {slug && project && (step === 3 || step === 4) && renderStage(stepMeta(step)!.stages[0])}
 
-      {slug && project && step === 6 && (
+      {slug && project && step === 5 && renderStage("manga-5-plan", { onPickCut: (p) => setPage(p) })}
+
+      {slug && project && step === 6 && renderStage("manga-6-conti")}
+
+      {slug && project && step === 7 && renderStage("manga-7-sheets")}
+
+      {slug && project && step === 8 && (
         <div className="stack" style={{ gap: "var(--s-4)" }}>
-          <div className="tabs" role="tablist" aria-label="7단계 작업">
+          <div className="tabs" role="tablist" aria-label="프롬프트 단계">
             {(
               [
-                ["make", "컷 · 프롬프트 만들기"],
+                ["make", "프롬프트 컴파일"],
                 ["preview", "원고 미리보기"],
                 ["bench", "워크벤치"],
               ] as const
@@ -275,41 +283,7 @@ export default function Wizard({
             ))}
           </div>
 
-          {tab === "make" && (
-            <div className="stack" style={{ gap: "var(--s-6)" }}>
-              {stepMeta(6)!.stages.map((id) => {
-                const st = stages.find((s) => s.id === id);
-                if (st && stageState(st.state) === "skip") {
-                  return (
-                    <div key={id} className="card stack-tight">
-                      <strong>{id}</strong>
-                      <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-                        {st.reason}
-                      </span>
-                    </div>
-                  );
-                }
-                return (
-                  <StageRunner
-                    key={id}
-                    slug={slug}
-                    ep={ep}
-                    stage={id}
-                    block={block}
-                    blocks={blocks}
-                    onBlock={setBlock}
-                    tier={tier}
-                    onRan={refresh}
-                    onProviders={onProviders}
-                    onPickCut={(p) => {
-                      setPage(p);
-                      setTab("preview");
-                    }}
-                  />
-                );
-              })}
-            </div>
-          )}
+          {tab === "make" && renderStage("manga-8-prompts")}
 
           {tab === "preview" && (
             <Preview
@@ -342,7 +316,6 @@ export default function Wizard({
         </div>
       )}
 
-      {/* the rail is the way back; this is only a convenience */}
       {step > 1 && (
         <div className="row">
           <button className="btn" onClick={() => onStep(step - 1)}>

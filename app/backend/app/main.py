@@ -63,6 +63,18 @@ def info() -> dict:
         "projects_dir": str(projects.PROJECTS),
         "skills_origin": str(skills.ORIGIN),
         "skills_edited": str(skills.EDITED),
+        "preflight": skills.preflight(),
+    }
+
+
+@app.get("/api/health")
+def health() -> dict:
+    """Is this install ready to draw a page? The UI asks before showing stages."""
+    pf = skills.preflight()
+    return {
+        "ok": pf["ok"],
+        "version": app.version,
+        "preflight": pf,
     }
 
 

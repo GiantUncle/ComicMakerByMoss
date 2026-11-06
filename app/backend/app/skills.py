@@ -60,6 +60,35 @@ def _origin_files() -> list[Path]:
     )
 
 
+# ---------------------------------------------------------------- self-check
+# What a fresh clone must have shipped with it. Without these the app cannot
+# lay out a single panel or compile a single prompt, so the backend reports the
+# gap at startup instead of failing on the first stage run.
+REQUIRED = (
+    "manga-craft/templates/moss-layouts.json",
+    "manga-craft/templates/layouts.json",
+    "manga-craft/scripts/compile_layout.py",
+    "manga-craft/scripts/instantiate_layout.py",
+    "manga-craft/scripts/build_negative.py",
+)
+
+
+def preflight() -> dict:
+    """Is the shipped skill library complete? Say what is missing, if not."""
+    missing = [rel for rel in REQUIRED if not (ORIGIN / rel).is_file()]
+    return {
+        "ok": not missing,
+        "origin": str(ORIGIN),
+        "missing": missing,
+        "assets": len(_origin_files()),
+        "hint": (
+            "the skill library is shipped code — if it is missing the clone is "
+            "incomplete (see .gitignore: .opencode/skills must NOT be ignored)"
+            if missing else ""
+        ),
+    }
+
+
 def list_assets() -> list[Asset]:
     out = []
     for p in _origin_files():

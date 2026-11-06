@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Lang, type ProjectSummary, type StageStatus } from "./api";
 import { applyTheme, loadTheme, THEMES, type Theme } from "./theme";
-import { pxLabel } from "./lib/canvas";
 import { STEPS, stepMeta, stageState } from "./lib/steps";
 import { openEpisodeId } from "./lib/project";
 import ModelMenu from "./components/ModelMenu";
@@ -111,10 +110,6 @@ export default function App() {
     setSlug(s);
     setStep(2); // 프로젝트 설정
   };
-  const closeProject = () => {
-    setSlug(null);
-    setStep(null);
-  };
 
   return (
     <div className="shell">
@@ -154,7 +149,7 @@ export default function App() {
             <span aria-hidden>{THEMES.find((t) => t.id === theme)?.icon ?? "🎨"}</span>
             {THEMES.find((t) => t.id === theme)?.label ?? theme}
           </button>
-          <ModelMenu />
+          <ModelMenu onChanged={() => window.location.reload()} onProviders={() => setStep(-1)} />
         </div>
       </header>
 
@@ -165,7 +160,6 @@ export default function App() {
           project={project}
           stages={stages}
           onStep={setStep}
-          onClose={closeProject}
           onNew={() => {
             setSlug(null);
             setStep(1); // 프로젝트 생성(모드 선택) — 레일에 표시되지 않음
@@ -204,7 +198,6 @@ function ProjectRail({
   project,
   stages,
   onStep,
-  onClose,
   onNew,
 }: {
   slug: string | null;
@@ -212,7 +205,6 @@ function ProjectRail({
   project: ProjectSummary | null;
   stages: StageStatus[];
   onStep: (n: number | null) => void;
-  onClose: () => void;
   onNew: () => void;
 }) {
   const done = STEPS.filter((s) => railRow(s.n, stages, slug).state === "done").length;
@@ -255,19 +247,6 @@ function ProjectRail({
             slug={slug}
             onStep={onStep}
           />
-
-          <div className="rail-foot">
-            <button
-              className="btn"
-              style={{ justifyContent: "flex-start", gap: "var(--s-2)" }}
-              aria-current={step === -1 ? "true" : undefined}
-              onClick={() => onStep(-1)}
-              title="AI 프로바이더 설정"
-            >
-              <span aria-hidden>⚙️</span>
-              AI 프로바이더 설정
-            </button>
-          </div>
         </>
       )}
 
@@ -276,6 +255,21 @@ function ProjectRail({
           프로젝트를 열거나 새로 만들면 여기에 단계 순서가 나타납니다.
         </p>
       )}
+
+      {/* provider setup is not project state — it works with no project open,
+          and the app cannot call a model without it, so it never hides */}
+      <div className="rail-foot">
+        <button
+          className="btn"
+          style={{ justifyContent: "flex-start", gap: "var(--s-2)" }}
+          aria-current={step === -1 ? "true" : undefined}
+          onClick={() => onStep(-1)}
+          title="AI 프로바이더 설정"
+        >
+          <span aria-hidden>⚙️</span>
+          AI 프로바이더 설정
+        </button>
+      </div>
     </nav>
   );
 }

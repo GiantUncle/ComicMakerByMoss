@@ -41,7 +41,6 @@ export default function StepStory({
   note: string | null;
 }) {
   const [text, setText] = useState("");
-  const [loadedEp, setLoadedEp] = useState<string | null>(null);
   const [sourceKind, setSourceKind] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -62,7 +61,6 @@ export default function StepStory({
   useEffect(() => {
     if (!current) {
       setText("");
-      setLoadedEp(null);
       setSourceKind(null);
       setApproved(false);
       return;
@@ -73,14 +71,12 @@ export default function StepStory({
       .then((s) => {
         if (!alive) return;
         setText(s.text ?? "");
-        setLoadedEp(current);
         setSourceKind(s.kind ?? null);
         setApproved(!!s.approved);
       })
       .catch(() => {
         if (!alive) return;
         setText("");
-        setLoadedEp(current);
         setSourceKind(null);
         setApproved(false);
       });

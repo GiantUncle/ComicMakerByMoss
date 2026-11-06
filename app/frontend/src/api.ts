@@ -314,7 +314,7 @@ export const api = {
   }) => req<StageRun>("/api/stages/retake", { method: "POST", body: JSON.stringify(body) }),
 
   retakeCut: (body: { slug: string; episode: string; page: number; panel: number; feedback?: string }) =>
-    req<{ conti: StageRun; page: StageRun }>("/api/stages/retake-cut", {
+    req<{ conti: StageRun; sheet?: StageRun; page: StageRun }>("/api/stages/retake-cut", {
       method: "POST",
       body: JSON.stringify(body),
     }),
@@ -336,7 +336,13 @@ export const api = {
       }[]
     >("/api/derive/templates" + (slug ? `?slug=${encodeURIComponent(slug)}` : "")),
   retemplate: (body: { slug: string; episode: string; page: number; layout: Record<string, unknown> }) =>
-    req<{ conti: StageRun; page: StageRun }>("/api/stages/retemplate", {
+    req<{ conti: StageRun; sheet?: StageRun; page: StageRun; prompt?: StageRun }>("/api/stages/retemplate", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  planTemplate: (body: { slug: string; episode: string; page: number; template_id: string }) =>
+    req<{ ok: boolean; page: number; template_id: string }>("/api/stages/plan-template", {
       method: "POST",
       body: JSON.stringify(body),
     }),

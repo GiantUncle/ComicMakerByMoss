@@ -1,0 +1,56 @@
+{
+  "width": 1024,
+  "height": 1536,
+  "bbox_coord_space": "abs",
+  "bbox_format": "xyxy",
+  "prefix": "<|artist|>fkey<|/artist|>",
+  "scene_type": "",
+  "must_not": [],
+  "palette": [],
+  "summary": {
+    "meta": ["comic", "multi_panel", "digital_painting"],
+    "canvas": "multi_panel",
+    "caption": "High-taste, fully colored 2D digital painting comic with selective focus: finely rendered, luminous facial features, glistening highlights and delicate hair strands contrasted against expressive, breathable painterly gouache brushwork on clothing and architecture. Muted, sophisticated warm peach skin and deep navy-blue color palette with soft bright indoor daylight, smooth creamy skin tones, crisp Chinese comic dialogue text in clean speech bubbles, zero rough sketch lines."
+  },
+  "items": [
+    {
+      "label": "object",
+      "caption": "A wide horizontal panel: <what happens in this panel>.",
+      "bbox": [32, 28, 632, 248]
+    },
+    {
+      "label": "object",
+      "caption": "A tall vertical panel: <what happens in this panel>.",
+      "bbox": [592, 38, 992, 738]
+    },
+    {
+      "label": "character",
+      "caption": "<character bible verbatim>. <pose>. <gaze and expression>. <foreground/background relationship>.",
+      "bbox": [252, 728, 1002, 1508]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese narration text in a plain white rectangular box.",
+      "text": "第一行文字\n第二行文字",
+      "bbox": [802, 88, 952, 378]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese dialogue text in a rounded speech balloon, the tail pointing left toward the speaker.",
+      "text": "您好！",
+      "bbox": [672, 728, 777, 1028]
+    },
+    {
+      "label": "text",
+      "caption": "Bold comic sound effect lettering.",
+      "text": "咔嗒",
+      "bbox": [902, 28, 982, 158]
+    },
+    {
+      "label": "text",
+      "caption": "Clean horizontal Chinese character name tag.",
+      "text": "姓名（15）",
+      "bbox": [242, 1388, 482, 1458]
+    }
+  ]
+}

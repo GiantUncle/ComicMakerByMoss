@@ -23,11 +23,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 OUT = REPO / ".opencode" / "skills" / "manga-craft" / "templates"
-DEFAULT_SRC = Path(r"C:\Users\gayai\AppData\Local\Temp\opencode\moss-ref")
+# Where the dataset clone usually sits. Never bake a machine-specific absolute
+# path in here: set MOSS_DATASET_SRC, or pass --src, on any other machine.
+DEFAULT_SRC = Path(
+    os.environ.get("MOSS_DATASET_SRC", REPO.parent / "ComfyUI-MossPanelDataset")
+)
 
 SOURCE = "sepiablue-ai/ComfyUI-MossPanelDataset"
 LICENSE = "MIT"

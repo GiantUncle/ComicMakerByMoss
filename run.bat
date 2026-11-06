@@ -24,13 +24,18 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [1/5] backend dependencies...
-python -c "import fastapi, uvicorn, httpx" >nul 2>nul
+echo [1/6] can this machine run it? (a clear answer beats a broken app)...
+python tools\doctor.py
 if errorlevel 1 (
-  python -m pip install -r "app\backend\requirements.txt"
+  echo.
+  echo [X] The checks above must pass before the app will run.
+  echo     Fix what is listed and start run.bat again.
+  echo.
+  pause
+  exit /b 1
 )
 
-echo [2/5] frontend dependencies...
+echo [2/6] frontend dependencies...
 if not exist "app\frontend\node_modules" (
   echo       first run - installing, this takes a minute...
   pushd "app\frontend"
@@ -40,15 +45,21 @@ if not exist "app\frontend\node_modules" (
   echo       already installed
 )
 
-echo [3/5] freeing ports 8000 / 5173 (avoid duplicate servers)...
+echo [3/6] backend dependencies...
+python -c "import fastapi, uvicorn, httpx" >nul 2>nul
+if errorlevel 1 (
+  python -m pip install -r "app\backend\requirements.txt"
+)
+
+echo [4/6] freeing ports 8000 / 5173 (avoid duplicate servers)...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 8000,5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force -ErrorAction Stop; Write-Host ('      stopped pid ' + $_) } catch {} }"
 timeout /t 1 /nobreak >nul
 
-echo [4/5] starting servers in this window...
+echo [5/6] starting servers in this window...
 start "backend"  /b /D "%~dp0app\backend"  cmd /c "python -m uvicorn app.main:app --port 8000"
 start "frontend" /b /D "%~dp0app\frontend" cmd /c "npm run dev"
 
-echo [5/5] waiting for the UI to answer...
+echo [6/6] waiting for the UI to answer...
 set /a tries=0
 :wait
 timeout /t 2 /nobreak >nul
