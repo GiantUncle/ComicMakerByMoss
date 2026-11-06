@@ -1,0 +1,114 @@
+{
+  "summary": {
+    "meta": ["comic", "multi_panel", "digital_painting"],
+    "canvas": "multi_panel",
+    "caption": "High-taste, fully colored 2-panel vertical 2D digital painting comic (2koma) with selective focus: finely rendered, luminous facial features, glistening highlights, and delicate hair strands contrasted against expressive, breathable painterly gouache brushwork on the sailor uniform and traditional wooden architecture. Muted, sophisticated warm peach skin and deep navy-blue color palette with soft bright indoor daylight, smooth creamy skin tones, crisp Chinese comic dialogue text in clean speech bubbles, zero rough sketch lines, 1girl, 1boy, school uniform, sailor collar, hair bun, traditional Japanese inn, ryokan, luggage, uncensored."
+  },
+  "items": [
+    {
+      "label": "object",
+      "caption": "Top-left horizontal panel: A traveler seen from behind stretching his arms high overhead in relief against a peaceful mountain village landscape.",
+      "bbox": [-740, -480, -520, 120]
+    },
+    {
+      "label": "object",
+      "caption": "Upper-right vertical panel: A 40-year-old bald, heavy-set man in a casual short-sleeve shirt and trousers standing beside a parked car, holding a travel suitcase handle in his left hand and looking calmly toward the inn.",
+      "bbox": [-730, 80, -30, 480]
+    },
+    {
+      "label": "object",
+      "caption": "Middle-left panel: Exterior view of a charming, rustic traditional Japanese two-story wooden country inn (minshuku) with tiled roofs nestled among mountain trees in warm daylight.",
+      "bbox": [-500, -490, -150, 90]
+    },
+    {
+      "label": "text",
+      "caption": "Ornate, stylized Japanese manga title logo in bold dark-navy and warm crimson typography with a clean decorative frame.",
+      "text": "《深山秘汤与看板娘美咲》\n—偏僻村落的独行宿泊记—",
+      "bbox": [-150, -490, -20, -150]
+    },
+    {
+      "label": "character",
+      "caption": "Main lower-center portrait focus: Our slender 15-year-old Japanese teenage schoolgirl (Misaki Shirosawa) with true adolescent grace—neither a big-headed 10-year-old child nor a mature 20-year-old woman. She has a softly tapered chin, a slender graceful neck, a small mole under her left eye, fair creamy peach-flushed skin, bright expressive light-amber eyes, and silky dark-brown hair tied up into a slightly loose, cute round bun at the back with airy, translucent wisps of bangs falling naturally across her forehead. She wears a plain matte dark-navy short-sleeve sailor school uniform top with three clean white stripes and a pleated navy skirt, leaning slightly forward with her hands clasped politely in front of her lap and a warm, welcoming smile as she greets the bald man seen from behind in the lower-right foreground.",
+      "bbox": [-40, -260, 740, 490]
+    },
+    {
+      "label": "object",
+      "caption": "Lower-left vertical sub-panel: Inside the wooden hallway entrance, the bald traveler stands on the left facing the petite 15-year-old sailor-uniform schoolgirl holding her school bag on the right as they chat.",
+      "bbox": [40, -490, 680, -270]
+    },
+    {
+      "label": "text",
+      "caption": "Bold comic sound effect text in the top-right corner.",
+      "text": "咔嗒",
+      "bbox": [-740, 390, -610, 470]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese narration text on the upper-right.",
+      "text": "人生过四十之后，我把\n旅行定为了自己的爱好",
+      "bbox": [-720, 260, -510, 340]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese narration text at the top-center.",
+      "text": "每逢连休我就会\n离开都市去远方",
+      "bbox": [-740, 20, -560, 95]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese narration text in the upper-left panel.",
+      "text": "虽说是旅行，但我既不\n转游观光胜地，反而更\n喜欢去那种连导游书上\n都不会登载的偏僻土地",
+      "bbox": [-730, -300, -530, -155]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese narration text on the far upper-left.",
+      "text": "对我而言，旅行或许是一项为了\n远离都市的人群、独自一人整理\n纷繁复杂的人际关系的行为。",
+      "bbox": [-730, -470, -530, -350]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese narration text in the middle-center.",
+      "text": "因此，这次的旅游目的地也是\n一个人迹罕至的深山小村庄。",
+      "bbox": [-480, -60, -280, 10]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese narration text above the wooden inn roof.",
+      "text": "我很中意在网络角落里偶然发现\n的一家充满手工感的民宿网站，\n于是决定住在那儿。",
+      "bbox": [-480, -180, -280, -80]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese greeting text in speech bubble on the middle-left.",
+      "text": "你好！",
+      "bbox": [-180, -390, -30, -310]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese dialogue text in speech bubble to the right of the girl's head.",
+      "text": "您是今天预约的客人吗？",
+      "bbox": [-40, 160, 260, 265]
+    },
+    {
+      "label": "text",
+      "caption": "Small vertical Chinese greeting text between the girl and the bald man.",
+      "text": "你好啊\n今天请多关照",
+      "bbox": [230, 180, 430, 280]
+    },
+    {
+      "label": "text",
+      "caption": "Clean vertical Chinese dialogue text in speech bubble to the left of the girl.",
+      "text": "哇—谢谢您！其实这地方差不多算是\n我妈的兴趣，基本上都没什么客人来呢",
+      "bbox": [-30, -270, 340, -140]
+    },
+    {
+      "label": "text",
+      "caption": "Clean horizontal Chinese character name tag near the bottom-left.",
+      "text": "白泽美咲（15）",
+      "bbox": [620, -270, 690, -30]
+    }
+  ],
+  "bbox_coord_space": "abs_centralized",
+  "bbox_format": "yxyx"
+}

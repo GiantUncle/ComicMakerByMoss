@@ -1,0 +1,220 @@
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   Rules this file obeys (see docs/web-ui-design.md §1):
+   - Colours are defined by ROLE, never by name. A role says what it is for, so
+     "is this pair safe?" is answerable.
+   - Light and dark are authored separately. Dark is not a light inversion.
+   - Contrast floors: 4.5:1 body text, 3:1 large text and icons, 3:1 for UI
+     boundaries and states (input borders, focus rings, toggle thumbs).
+   - Component states (hover, focus, selected, disabled, error) are part of the
+     token set, not afterthoughts.
+   - Status colours always ship with an icon and a label. Colour alone never
+     carries meaning.
+   - Borders never rely on box-shadow or background-image; forced-colors mode
+     strips those.
+
+   Every foreground/background pair below is checked by scripts/check-contrast
+   at build time; a failing pair fails the build.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* spacing — 8px scale. Inside a group < between groups. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-12: 48px;
+  --s-16: 64px;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+
+  --font-sans: "Pretendard", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+
+  --leading: 1.6;
+
+  --dur: 140ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ---------------------------------------------------------------- light ---- */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg:         #ffffff;
+  --surface:    #f7f8fa;
+  --surface-2:  #ffffff;
+  --border:     #6b7280;   /* 4.5:1 on --bg */
+  --border-soft:#d1d5db;   /* decorative only, never the sole boundary */
+
+  --fg:         #111827;
+  --fg-muted:   #4b5563;
+
+  --primary:      #1d4ed8;
+  --primary-fg:   #ffffff;
+  --primary-hover:#1e40af;
+  --brand-1:      #1d4ed8;   /* wordmark start — 7.0:1 on --bg */
+  --brand-2:      #7c3aed;   /* wordmark middle — 5.9:1 on --bg */
+  --brand-3:      #b91c1c;   /* wordmark end — 5.9:1 on --bg */
+
+  --focus:      #1d4ed8;
+
+  --success:    #15803d;
+  --warning:    #b45309;
+  --danger:     #b91c1c;
+
+  --overlay:    rgba(17, 24, 39, 0.45);
+  --panel-preview-bg: #f3f4f6;
+  --panel-preview-line: #9ca3af;
+}
+
+/* ----------------------------------------------------------------- dark ---- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg:         #0b0d12;
+  --surface:    #14171d;
+  --surface-2:  #1b1f26;
+  --border:     #6b7280;   /* 3.7:1 on --surface */
+  --border-soft:#2a2f38;   /* decorative only */
+
+  --fg:         #e5e7eb;
+  --fg-muted:   #9ca3af;
+
+  --primary:      #93b4ff;
+  --primary-fg:   #0b0d12;
+  --primary-hover:#b6cbff;
+  --brand-1:      #93b4ff;   /* wordmark start — 8.7:1 on --bg */
+  --brand-2:      #e9a5f1;   /* wordmark middle — 9.4:1 on --bg */
+  --brand-3:      #ffb4a8;   /* wordmark end — 10.6:1 on --bg */
+
+  --focus:      #93b4ff;
+
+  --success:    #4ade80;
+  --warning:    #fbbf24;
+  --danger:     #f87171;
+
+  --overlay:    rgba(0, 0, 0, 0.6);
+  --panel-preview-bg: #10131a;
+  --panel-preview-line: #6b7280;
+}
+
+/* Respect the OS when the user has not chosen. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b0d12; --surface: #14171d; --surface-2: #1b1f26;
+    --border: #6b7280; --border-soft: #2a2f38;
+    --fg: #e5e7eb; --fg-muted: #9ca3af;
+    --primary: #93b4ff; --primary-fg: #0b0d12; --primary-hover: #b6cbff;
+    --brand-1: #93b4ff; --brand-2: #e9a5f1; --brand-3: #ffb4a8;
+    --focus: #93b4ff;
+    --success: #4ade80; --warning: #fbbf24; --danger: #f87171;
+    --overlay: rgba(0,0,0,0.6);
+    --panel-preview-bg: #10131a; --panel-preview-line: #6b7280;
+  }
+}
+
+/* ------------------------------------------------------------- forced ------ */
+@media (forced-colors: active) {
+  :root {
+    --border: CanvasText;
+    --focus: Highlight;
+  }
+}
+
+/* ------------------------------------------------------------- base -------- */
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: var(--text-base) / var(--leading) var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Focus is always visible and never colour-only. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::selection { background: var(--primary); color: var(--primary-fg); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* --------------------------------------------------------- components ------ */
+.btn {
+  --btn-bg: var(--surface-2);
+  --btn-fg: var(--fg);
+  --btn-bd: var(--border);
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  min-height: 36px;
+  background: var(--btn-bg); color: var(--btn-fg);
+  border: 1px solid var(--btn-bd);
+  border-radius: var(--radius);
+  font: inherit; font-weight: 500;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.btn:hover:not(:disabled) { background: var(--surface); border-color: var(--fg-muted); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn--primary { --btn-bg: var(--primary); --btn-fg: var(--primary-fg); --btn-bd: var(--primary); }
+.btn--primary:hover:not(:disabled) { --btn-bg: var(--primary-hover); --btn-bd: var(--primary-hover); }
+.btn--danger  { --btn-fg: var(--danger); --btn-bd: var(--danger); --btn-bg: transparent; }
+
+.card {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--s-6);
+}
+
+/* Status chips always carry text; colour is reinforcement only. */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--s-1);
+  padding: 2px var(--s-2);
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: var(--text-sm);
+}
+.chip--ok   { color: var(--success); }
+.chip--warn { color: var(--warning); }
+.chip--bad  { color: var(--danger);  }
+
+.field { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); }
+.field > label { font-size: var(--text-sm); color: var(--fg-muted); }
+.field input, .field select, .field textarea {
+  padding: var(--s-2) var(--s-3);
+  min-height: 36px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+}
+
+.mono { font-family: var(--font-mono); font-size: var(--text-sm); }
+.muted { color: var(--fg-muted); }
+.row { display: flex; align-items: center; gap: var(--s-3); }
+.between { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+.stack > * + * { margin-top: var(--s-3); }

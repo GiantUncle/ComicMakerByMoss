@@ -1,0 +1,121 @@
+{
+  "summary": {
+    "meta": [
+      "comic",
+      "multi_panel",
+      "digital_painting"
+    ],
+    "canvas": "multi_panel",
+    "caption": "High-taste, fully colored 2D digital painting comic with selective focus: finely rendered layers contrasted against expressive painterly brushwork. Muted warm peach skin and deep navy palette under soft bright stage light, zero rough sketch lines."
+  },
+  "items": [
+    {
+      "label": "object",
+      "caption": "A wide panel of a brightly lit talk-show set: a warm cream and crimson stage seen from the audience side, empty of people.",
+      "bbox": [
+        -664,
+        7,
+        -339,
+        456
+      ]
+    },
+    {
+      "label": "text",
+      "caption": "Clean horizontal narration text in a plain white rectangular box.",
+      "text": "The Second Night",
+      "bbox": [
+        -644,
+        64,
+        -554,
+        404
+      ]
+    },
+    {
+      "label": "object",
+      "caption": "A medium panel of the audience seen from the stage: rows of tired commuters in grey and navy office clothes, lit by a warm stage wash.",
+      "bbox": [
+        -664,
+        -456,
+        -339,
+        -7
+      ]
+    },
+    {
+      "label": "text",
+      "caption": "Clean horizontal narration text in a plain white rectangular box.",
+      "text": "The seats filled in an instant.\nEvery one of them in office wear.",
+      "bbox": [
+        -504,
+        -426,
+        -374,
+        -76
+      ]
+    },
+    {
+      "label": "character",
+      "caption": "A medium panel on the young woman at the edge of the glow: she is a woman in her mid-twenties with a soft oval face, calm dark eyes, and sleek dark hair pulled into a low ponytail. She stands turned three quarters toward the audience, one hand half raised in surprise.",
+      "bbox": [
+        -325,
+        -456,
+        0,
+        456
+      ]
+    },
+    {
+      "label": "text",
+      "caption": "Clean horizontal dialogue text in a rounded speech balloon, the tail pointing left.",
+      "text": "Huh — what is this…?",
+      "bbox": [
+        -284,
+        124,
+        -174,
+        404
+      ]
+    },
+    {
+      "label": "object",
+      "caption": "A tall panel of the TV-headed host at the centre of the stage: an ageless showman with a boxy old CRT television for a head, a glowing screen face, and an immaculate ebony tuxedo with a deep crimson bow tie. He spreads both arms wide toward the room.",
+      "bbox": [
+        14,
+        -456,
+        664,
+        456
+      ]
+    },
+    {
+      "label": "text",
+      "caption": "Clean horizontal dialogue text in a rounded speech balloon, the tail pointing right.",
+      "text": "Welcome, office workers, one and all.",
+      "bbox": [
+        76,
+        -376,
+        196,
+        -36
+      ]
+    },
+    {
+      "label": "text",
+      "caption": "Bold comic sound effect lettering.",
+      "text": "clack",
+      "bbox": [
+        296,
+        204,
+        416,
+        404
+      ]
+    },
+    {
+      "label": "text",
+      "caption": "Clean horizontal character name tag.",
+      "text": "Brown",
+      "bbox": [
+        476,
+        -116,
+        556,
+        124
+      ]
+    }
+  ],
+  "bbox_coord_space": "abs_centralized",
+  "bbox_format": "yxyx"
+}

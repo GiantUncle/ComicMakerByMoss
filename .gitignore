@@ -1,0 +1,39 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+
+# Node / frontend build
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# App-generated / user project data
+projects/
+
+# Local scratch & root test outputs (not part of the repo)
+scratch/
+_local/
+.opencode/
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/*.gif
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
