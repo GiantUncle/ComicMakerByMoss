@@ -179,7 +179,11 @@ body {
 .btn:hover:not(:disabled) { background: var(--surface); border-color: var(--fg-muted); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn--primary { --btn-bg: var(--primary); --btn-fg: var(--primary-fg); --btn-bd: var(--primary); }
-.btn--primary:hover:not(:disabled) { --btn-bg: var(--primary-hover); --btn-bd: var(--primary-hover); }
+.btn--primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  color: var(--primary-fg);
+  border-color: var(--primary-hover);
+}
 .btn--danger  { --btn-fg: var(--danger); --btn-bd: var(--danger); --btn-bg: transparent; }
 
 .card {
