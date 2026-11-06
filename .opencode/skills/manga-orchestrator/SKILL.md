@@ -22,8 +22,15 @@ runs next, and reports.
 Three rules it never breaks:
 
 1. **Dispatch the stage skill and let it write its own artifact.**
-2. **An existing gate is the answer** — report it and move on.
+2. **An existing gate skips the dispatch, never the validation** — report the
+   gate, then run that stage's script check (see §3) before moving on.
 3. **A decision a human owes is asked for**, then waited on.
+
+After every dispatch the orchestrator **actively runs the validator scripts**
+(the same `validate.py` / `compile_layout.py --check` /
+`tools/check_episode.py` the GUI runs on the result) and prints the outcome
+next to the pass line — `0 errors` to continue, the exact issue list to
+re-dispatch.
 
 ## 1. The loop
 
@@ -96,23 +103,61 @@ Do not restate the stage's steps in the hand-off; the stage skill owns them.
 limits; only run blocks concurrently when the environment tolerates it, and
 never for stages 1-5, which must stay coherent.
 
-## 3. Verify after every pass
+## 3. Verify after every pass — run the scripts, not your eyes
 
-A stage is not done because it said so. Check its artifact:
+A stage is not done because it said so. The GUI runs the deterministic
+validator (`app/backend/app/stages/validate.py`) the moment a stage returns and
+shows `[level] code where: message`. The orchestrator must run the **same
+scripts itself, actively, after every dispatch and before moving on** — never
+eyeball an artifact and call it checked. An existing gate skips the *dispatch*,
+never the *validation* (that is what catches a stale plan, a duplicate layout,
+or a hand-edited file).
 
-| Stage | Check |
-| --- | --- |
-| 1 source | `episodes/<ep>/episode.json` has an id and a 3-language title; `source/novel.txt` exists, non-empty; the gate exists |
-| 2 project | `project.json` parses; the canvas tier is in the library; `panels.min` <= `panels.max` |
-| 3 bible | every card has a name-slug `id`, a 3-language `name`, 2-4 anchors, one signature, an appearance-only `descriptor`; the episode's `cast` lists who appears |
-| 4 sheets | every character in the episode's `cast` has a sheet prompt or an approved image; `bible/SHEETS_APPROVED` exists |
-| 5 plan | `page_total` is a multiple of 4; every page's `panel_target` is inside `panels.min`..`panels.max`; every page has a `story_job` and a hook from page 2 |
-| 6 conti | one `anchor_of` per character per page; every text entry has `lines.ko`, `lines.en` and `lines.ja` with matching line counts; no caption carries an id or a name |
-| 7 sheets | every sheet passes `../manga-craft/scripts/compile_layout.py --check` with no warning; no overlapping panels |
-| 8 prompts | every prompt carries the trigger and no `ref_id` |
+Run from the repo root with `sys.path` set to `app/backend` so `app.stages`
+imports resolve. Every check below must report **0 errors**. Hand the exact
+issue list (`level` / `code` / `where` / `message`) back to the stage and
+re-dispatch only that stage / block. Two failures in a row on the same stage:
+stop and report.
 
-On a failed check, fix within the stage: re-dispatch it with the failure named.
-If it fails twice, stop and report.
+| Stage | Script check (same as GUI) | Error / warning codes to enforce |
+| --- | --- | --- |
+| 1 source | `episode.json` parses, `id` + 3-lang `title` non-empty; `source/novel.txt` non-empty; `source/APPROVED` exists | gate / file presence |
+| 2 project | `project.json` parses; `project.canvas.tier` in `app.stages.build.library()["sizes"]`; `panels.min <= panels.max` | file presence |
+| 3 bible | `app.stages.validate.validate_bible(pool, episode_cast)` | `bible.bad-id` `bible.dup-id` `bible.no-descriptor` `bible.style-in-descriptor` `bible.anchors` `bible.no-signature` `bible.no-identifier` `bible.cast-unknown` (warn: `bible.name-langs`) |
+| 4 ref sheets | every `cast` id has `bible/characters/<slug>/sheet.prompt.txt` or approved image; `bible/SHEETS_APPROVED` exists | file presence |
+| 5 plan | `app.stages.validate.validate_plan(plan, project)` | `plan.no-page-total` `plan.not-multiple-of-4` `plan.page-count` `plan.no-story-job` `plan.no-reader-state` `plan.panel-target` `plan.bad-split` `plan.shape-mismatch` `plan.bad-template`(warn) `plan.no-hook` `plan.focus-on-even` `plan.missing-focus` `plan.repeat-layout` |
+| 6 conti (per block) | `app.stages.validate.validate_conti(conti, project)` per page; after the block run `app.stages.validate.validate_episode(all_contis_in_episode, project)` | `conti.no-story-job` `conti.bad-tier` `conti.bad-reading` `conti.no-panels` `conti.bad-template` `conti.panel-mismatch` `layout.wrong-shape` `conti.panel-count` `conti.panel-no-beat` `conti.panel-no-tier` `conti.anchor-count` `conti.dup-text-id` `conti.bad-kind` `conti.bad-bubble` `conti.bad-panel-ref` `conti.missing-lang` `conti.line-count` `conti.text-box-off-canvas` `episode.no-layout` `episode.repeat-layout` |
+| 7 sheets (per block) | `../manga-craft/scripts/compile_layout.py <sheet> --check` **and** `app.stages.validate.validate_draft(draft, project)` per `page-NNN.sheet.json` | `canvas.bad` `canvas.not-multiple-16` `summary.no-caption` `items.empty` `item.not-object` `item.unknown-field` `item.bad-label` `item.no-caption` `item.bad-bbox` `item.text-empty` `panels.overlap` `item.ref-id-leaked` (on prompt) — **no warning allowed** (`item.text-too-small` `page.panel-count` `page.detail-cuts` count as fail for build) |
+| 8 prompts (per block) | compile is re-run; `app.stages.validate.validate_prompt(prompt_obj, w, h, project)` per `page-NNN.prompt.txt`; `page-NNN.negative.txt` has the three blocks (`painterly`/`clean`/`lineart` + age) | `summary.no-caption` `prompt.coord-space` `item.*` (above, with `compiled=True`: **no `ref_id`** allowed — `item.ref-id-leaked`) FKEY trigger present; negative three sections present — **no warning allowed** |
+
+Episode-wide net — after stages 5–8, and before the wrap, run the same tool the
+GUI checks use so plan, conti, layout reuse and prompt geometry are checked together:
+
+```
+python tools/check_episode.py <slug> --ep <ep>
+```
+
+Demand `0 error(s)`. On any error, re-dispatch the owning stage for only the
+failing pages (see `pipeline.md` §2.1 retake scope), re-run the script, and
+only continue when it passes. Warnings (`item.text-too-small`,
+`page.panel-count`, `page.detail-cuts`, `plan.bad-template`,
+`bible.name-langs`, `conti.no-text-box`) must be **reported verbatim** in the
+pass line, and for stages 7–8 they block the build exactly as the GUI build does.
+
+Example invocations (run from repo root):
+
+```
+python -c "import sys; sys.path.insert(0,'app/backend'); import json; from app.stages import validate; plan=json.load(open('projects/<slug>/episodes/<ep>/plan/page-story-plan.json',encoding='utf-8')); project=json.load(open('projects/<slug>/project.json',encoding='utf-8')); print(validate.validate_plan(plan, project))"
+
+python ../manga-craft/scripts/compile_layout.py projects/<slug>/episodes/<ep>/pages/page-001.sheet.json --check
+
+python tools/check_episode.py <slug> --ep <ep>
+```
+
+Do not restate definitions of the codes here — read them from
+`app/backend/app/stages/validate.py` (structure + geometry: “panel boxes never
+overlap”, “a compiled prompt carries no `ref_id`”, “one layout per page per
+episode”). When the script and this table ever disagree, the script wins.
 
 ## 4. When to stop
 
@@ -122,8 +167,8 @@ Stop, report, and wait in these cases — never push past them:
 | --- | --- |
 | The wizard needs an answer | ask it, verbatim, one question |
 | A stage asks for approval | show the artifact's summary, ask, continue on yes |
-| A gate exists but the artifact is wrong | report both; do not silently rebuild |
-| The same stage fails twice | report the failure and the check that failed |
+| A gate exists but script validation reports errors | report both and the issue list; do not silently rebuild, and do not advance past the stage |
+| The same stage / block fails validation twice | report the failure, the codes, and where; hand the error list to the stage for a retake |
 | A boundary would be crossed (a stage wants to write another stage's file) | refuse and report |
 | The user scoped the run to stop earlier | stop at that stage |
 
