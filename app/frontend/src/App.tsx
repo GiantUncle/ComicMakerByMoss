@@ -299,6 +299,7 @@ function StepGroup({
             key={s.n}
             className="rail-item"
             aria-current={active ? "step" : undefined}
+            title={s.blurb}
             onClick={() => onStep(s.n)}
           >
             <span className="rail-num" aria-hidden>
