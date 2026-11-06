@@ -158,10 +158,14 @@ export default function StageRunner({  slug,
     const total = Math.max(1, blocks);
     const items: BatchItem[] = [];
     setBatch({ running: true, mode, current: 1, total, items: [] });
-    setRun(rkey, { error: null, result: null });
     const fb = feedback.trim() || (mode === "retake" ? "전체 다시 실행" : "실행");
     try {
       for (let b = 1; b <= total; b++) {
+        // record each block under ITS OWN run key: the block prop advances
+        // mid-loop via onBlock, so the start-block key would hide a later
+        // block's error/result from the screen that goes looking for it.
+        const bkey = runKey(slug, ep, stage, b);
+        setRun(bkey, { error: null, result: null });
         setBatch({ running: true, mode, current: b, total, items: [...items] });
         onBlock(b);
         try {
@@ -174,7 +178,7 @@ export default function StageRunner({  slug,
         } catch (e) {
           items.push({ block: b, pages: blockRange(b), ok: false, error: String(e) });
           setBatch({ running: false, mode, current: b, total, items: [...items] });
-          setRun(rkey, { error: `블록 ${b} (${blockRange(b)}) 실패: ${String(e)}` });
+          setRun(bkey, { error: `블록 ${b} (${blockRange(b)}) 실패: ${String(e)}` });
           reload();
           setReviewTick((t) => t + 1);
           onRan?.();
@@ -184,7 +188,7 @@ export default function StageRunner({  slug,
         setReviewTick((t) => t + 1);
       }
       setBatch({ running: false, mode, current: total, total, items: [...items] });
-      setRun(rkey, { result: { stage, note: `전체 블록 완료 (${total}개, ${total * 4}p 범위 기준)` } as any });
+      setRun(runKey(slug, ep, stage, total), { result: { stage, note: `전체 블록 완료 (${total}개, ${total * 4}p 범위 기준)` } as any });
       setFeedback("");
       setSelectedPages([]);
       reload();
@@ -192,7 +196,6 @@ export default function StageRunner({  slug,
       onRan?.();
     } catch (e) {
       setBatch((prev) => (prev ? { ...prev, running: false } : prev));
-      setRun(rkey, { error: String(e) });
     }
   }
 
@@ -235,9 +238,10 @@ export default function StageRunner({  slug,
       const blockList = Array.from(byBlock.keys()).sort((a, b) => a - b);
       const items: BatchItem[] = [];
       setBatch({ running: true, mode: "retake", current: blockList[0] ?? 1, total: blockList.length, items: [] });
-      setRun(rkey, { error: null, result: null });
       const fb = feedback.trim() || "선택 페이지 다시 실행";
       for (const b of blockList) {
+        const bkey = runKey(slug, ep, stage, b);
+        setRun(bkey, { error: null, result: null });
         setBatch({ running: true, mode: "retake", current: b, total: blockList.length, items: [...items] });
         onBlock(b);
         try {
@@ -246,15 +250,16 @@ export default function StageRunner({  slug,
         } catch (e) {
           items.push({ block: b, pages: (byBlock.get(b) || []).join(",") + "p", ok: false, error: String(e) });
           setBatch({ running: false, mode: "retake", current: b, total: blockList.length, items: [...items] });
-          setRun(rkey, { error: `블록 ${b} 선택 페이지 실패: ${String(e)}` });
+          setRun(bkey, { error: `블록 ${b} 선택 페이지 실패: ${String(e)}` });
           reload(); setReviewTick((t) => t + 1); onRan?.();
           return;
         }
         setBatch({ running: true, mode: "retake", current: b, total: blockList.length, items: [...items] });
         setReviewTick((t) => t + 1);
       }
-      setBatch({ running: false, mode: "retake", current: blockList[blockList.length - 1] ?? 1, total: blockList.length, items: [...items] });
-      setRun(rkey, { result: { stage, note: `선택한 페이지 ${selectedPages.length}개 다시 실행 완료` } as any });
+      const lastBlock = blockList[blockList.length - 1] ?? 1;
+      setBatch({ running: false, mode: "retake", current: lastBlock, total: blockList.length, items: [...items] });
+      setRun(runKey(slug, ep, stage, lastBlock), { result: { stage, note: `선택한 페이지 ${selectedPages.length}개 다시 실행 완료` } as any });
       setFeedback(""); setSelectedPages([]); reload(); setReviewTick((t) => t + 1); onRan?.();
       return;
     }
