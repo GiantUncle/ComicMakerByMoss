@@ -11,14 +11,14 @@ import Wizard from "./screens/Wizard";
 /**
  * The shell.
  *
- * The left rail is one project's seven steps — the only thing a user came here
+ * The left rail is one project's eight steps — the only thing a user came here
  * to do. Every step is reachable in both directions: open a project, click any
  * step, see what that step made, judge it, and retake it. The manuscript
- * preview and the workbench are tabs inside step 7, not screens of their own.
+ * preview and the workbench are tabs inside step 8, not screens of their own.
  * The provider is app setup, so it sits at the bottom of the rail and never
  * competes with the work.
  *
- * `step` drives the main area: null is the project list, 1..7 are the steps,
+ * `step` drives the main area: null is the project list, 1..8 are the steps,
  * -1 is the provider screen.
  */
 

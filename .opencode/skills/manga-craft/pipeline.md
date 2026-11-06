@@ -1,6 +1,8 @@
 # Pipeline — the stage router
 
-A story becomes prompts through seven stages. **One invocation runs one stage.**
+A story becomes prompts through eight stages: 1 source · 2 project · 3 bible ·
+4 ref sheets · 5 plan · 6 conti (AI: scene · dialogue · narration · SFX in KO/EN/JA)
+→ 7 cut sheets (deterministic: coordinates/sheets) → 8 prompts (deterministic: final compile). **One invocation runs one stage.**
 Each stage reads the artifacts the stage before it left, writes its own, and
 stamps a gate. Following the order is what produces a good prompt set; nothing
 outside a stage's own artifact is that stage's business.
@@ -55,11 +57,12 @@ file.
 | 4 | `manga-4-refsheets` | project | `bible/APPROVED`, episode cast | `bible/characters/<name-slug>/` | `bible/SHEETS_APPROVED` |
 | 5 | `manga-5-plan` | episode | source, `bible/APPROVED`, `project.json` | `episodes/<ep>/plan/page-story-plan.json` | `episodes/<ep>/plan/APPROVED` |
 | 6 | `manga-6-conti` | episode | plan, cast, `project.json` | `episodes/<ep>/pages/page-NNN.conti.json` | — |
-| 7 | `manga-7-pages` | episode | contis, `project.json` | `episodes/<ep>/pages/page-NNN.sheet.json`, `episodes/<ep>/prompts/` | — |
+| 7 | `manga-7-sheets` | episode | contis, `project.json` | `episodes/<ep>/pages/page-NNN.sheet.json` | — |
+| 8 | `manga-8-prompts` | episode | sheets, `project.json` | `episodes/<ep>/prompts/` | — |
 
 Stages 2, 3 and 4 run **once per project**. Stage 3 extends the pool for each new
-episode; stage 4 draws only the characters that have no sheet yet. Stages 1, 5, 6
-and 7 run **once per episode**.
+episode; stage 4 draws only the characters that have no sheet yet. Stages 1, 5–8
+run **once per episode** (6–8 per 4-page block, in order conti → sheets → prompts).
 
 Stages 4 and 5 are `manga`-only. `illustration` ends after stage 4; `comic` after
 stage 5 with a single frame.
@@ -96,7 +99,8 @@ stage works in:
 | 3 bible · 4 sheets | the selected characters (the pool's other cards stay) |
 | 5 plan | the selected pages (the page count stays) |
 | 6 conti | the selected pages, or a single cut (the other panels stay) |
-| 7 pages | the selected pages, or a single cut (rebuild and re-validate) |
+| 7 sheets | the selected pages, or a single cut (rebuild and re-validate) |
+| 8 prompts | the selected pages, or a single cut (recompile and re-validate) |
 
 A retake carries the user's note into the same prompt, changes only the selected
 part, and re-runs the checks. Geometry is never the model's to place: stage 7
@@ -142,10 +146,11 @@ then split.
 
 ## 5. Work splitting
 
-Stages 6 and 7 split by **block of 4 pages**, because stage 5 fixes what each page
+Stages 6–8 split by **block of 4 pages**, because stage 5 fixes what each page
 must do. One worker per block, reading `project.json`, `bible/characters.json`,
 its slice of the episode's `page-story-plan.json`, and the matching source span.
-A block worker writes only its own pages.
+A block worker writes only its own pages. A block flows conti → sheets → prompts
+in that order; sheets need the conti, prompts need the sheet.
 
 Stages 1 to 5 run once each, in order, by one worker, so the plan stays coherent.
 
@@ -161,7 +166,7 @@ talk-show — manga
   bible     approved (5 characters)      sheets approved (5 sheet prompts)
   ep01      12 pages — plan approved, pages 1-12 built
   ep02      16 pages — plan approved, pages 1-4 built
-Next: stages 6-7 for ep02 pages 5-8.
+Next: stages 6-8 for ep02 pages 5-8.
 ```
 
 ## 7. Invariants across stages
@@ -188,7 +193,7 @@ Next: stages 6-7 for ep02 pages 5-8.
 
 | File | Contents |
 | --- | --- |
-| stage skills | `manga-1-source` … `manga-7-pages`. |
+| stage skills | `manga-1-source` … `manga-8-prompts`. |
 | `authoring-spec.md` | The behavior spec for writing a prompt. |
 | `comic-planning.md` | Panel grammar R1-R21, page geometry, box sizing, text treatments. |
 | `character-consistency.md` | R-A~R-E and reference-image wiring. |

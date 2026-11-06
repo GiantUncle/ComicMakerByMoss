@@ -1,6 +1,6 @@
 ---
 name: Manga Orchestrator
-description: Autonomous driver for the whole manga pipeline. One invocation takes a project from nothing to finished prompts — it runs start-wizard, then drives stages 1 through 7 in order, dispatching each stage skill, verifying each artifact and gate, and pausing only where a human must decide. Use when the user says "run the whole thing", "just make it", "orchestrate", "manga orchestrator", "go end to end", or wants the pipeline advanced without naming each stage.
+description: Autonomous driver for the whole manga pipeline. One invocation takes a project from nothing to finished prompts — it runs start-wizard, then drives stages 1 through 8 in order, dispatching each stage skill, verifying each artifact and gate, and pausing only where a human must decide. Use when the user says "run the whole thing", "just make it", "orchestrate", "manga orchestrator", "go end to end", or wants the pipeline advanced without naming each stage.
 ---
 
 # Manga Orchestrator
@@ -49,7 +49,8 @@ episode in turn. Print one line per pass so the pipeline is visible:
 [ep01]    source   locked    -> episodes/ep01/source/APPROVED
 [ep01]    plan     approved  -> 12 pages (3 blocks)
 [ep01]    conti    block 1/3 -> pages 1-4
-[ep01]    pages    block 1/3 -> 4 prompts
+[ep01]    sheets   block 1/3 -> 4 sheets
+[ep01]    prompts  block 1/3 -> 4 prompts
 [ep02]    source   locked    -> episodes/ep02/source/APPROVED
 [ep02]    bible    extended  -> 2 new characters, cast recorded
 [ep02]    plan     approved  -> 16 pages (4 blocks)
@@ -69,7 +70,8 @@ stage runs once, an episode stage runs once per episode.
 | 4 | `manga-4-refsheets` | project | `bible/characters/<name-slug>/` |
 | 5 | `manga-5-plan` | episode | `episodes/<ep>/plan/page-story-plan.json` |
 | 6 | `manga-6-conti` | episode | `episodes/<ep>/pages/page-NNN.conti.json` |
-| 7 | `manga-7-pages` | episode | `episodes/<ep>/pages/*.sheet.json`, `episodes/<ep>/prompts/` |
+| 7 | `manga-7-sheets` | episode | `episodes/<ep>/pages/*.sheet.json` |
+| 8 | `manga-8-prompts` | episode | `episodes/<ep>/prompts/` |
 
 How to dispatch each:
 
@@ -77,7 +79,7 @@ How to dispatch each:
 | --- | --- |
 | 0 `start-wizard` | load and run it here — it is interactive, so relay its questions |
 | 1-5 | load the stage skill and follow it here, once each, in order |
-| 6-7 | one worker per **block of 4 pages**, because stage 5 fixed what each page does |
+| 6-8 | one worker per **block of 4 pages**, in order conti → sheets → prompts, because stage 5 fixed what each page does |
 
 For a block, hand a worker exactly three lines — the skill, the project, the
 block — and let it read the rest from disk:
@@ -106,7 +108,8 @@ A stage is not done because it said so. Check its artifact:
 | 4 sheets | every character in the episode's `cast` has a sheet prompt or an approved image; `bible/SHEETS_APPROVED` exists |
 | 5 plan | `page_total` is a multiple of 4; every page's `panel_target` is inside `panels.min`..`panels.max`; every page has a `story_job` and a hook from page 2 |
 | 6 conti | one `anchor_of` per character per page; every text entry has `lines.ko`, `lines.en` and `lines.ja` with matching line counts; no caption carries an id or a name |
-| 7 pages | every sheet passes `../manga-craft/scripts/compile_layout.py --check` with no warning; every prompt carries the trigger and no `ref_id` |
+| 7 sheets | every sheet passes `../manga-craft/scripts/compile_layout.py --check` with no warning; no overlapping panels |
+| 8 prompts | every prompt carries the trigger and no `ref_id` |
 
 On a failed check, fix within the stage: re-dispatch it with the failure named.
 If it fails twice, stop and report.
@@ -133,7 +136,7 @@ Run the manga orchestrator for talk-show.
 Run to the plan.               (stops after stage 5)
 Run from the conti.            (starts at stage 6)
 Only rebuild block 3 of ep02.
-Just add episode 3.            (runs stages 1, 3, 4, 5, 6, 7 for the new episode)
+Just add episode 3.            (runs stages 1, 3, 4, 5, 6, 7, 8 for the new episode)
 ```
 
 Honor the scope, and say at the top which stages this run will cover.

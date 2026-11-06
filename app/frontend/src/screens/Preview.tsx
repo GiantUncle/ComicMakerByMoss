@@ -12,7 +12,7 @@ import { TIERS, pxLabel } from "../lib/canvas";
 import { KIND_LABEL, countKinds, isVertical, letteringKind, tailDir } from "../lib/lettering";
 
 /**
- * The manuscript preview — a step 7 tab, not a screen of its own.
+ * The manuscript preview — a step 8 tab, not a screen of its own.
  *
  * A page is drawn at its real pixel size from the compiled prompt: ruled panel
  * boxes with their prompt text, balloons with their tails, the tall narration

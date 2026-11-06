@@ -100,7 +100,7 @@ Each phase hands to exactly one stage skill.
 | 4 Cast | project | who is in this episode — extends the pool | `manga-3-bible` |
 | 5 Sheets | project | how references are made — draws only the missing ones | `manga-4-refsheets` |
 | 6 Page plan | **episode** | confirm the pages and the rhythm | `manga-5-plan` |
-| 7 Blocks | **episode** | confirm each 4-page block | `manga-6-conti` → `manga-7-pages` |
+| 7 Blocks | **episode** | confirm each 4-page block | `manga-6-conti` → `manga-7-sheets` → `manga-8-prompts` |
 
 Phases 1, 3, 4 and 5 run **once per project**. Phases 2, 6 and 7 run **once per
 episode**: on the first episode they follow phase 1 in order, and on a later
@@ -273,7 +273,7 @@ Q7.2 Review block N (pages A-D).   (the stage skill prints it first)
   c. rebuild one page
 ```
 
-Hand to `manga-6-conti`, then `manga-7-pages`. Repeat per block until the last.
+Hand to `manga-6-conti`, then `manga-7-sheets`, then `manga-8-prompts`. Repeat per block until the last.
 
 ## 5. First message of a fresh run
 
@@ -308,7 +308,7 @@ projects/<slug>/
   episodes/<ep>/plan/page-story-plan.json  manga-5-plan   EPISODE
   episodes/<ep>/plan/APPROVED          manga-5-plan       gate
   episodes/<ep>/pages/page-NNN.conti.json  manga-6-conti  EPISODE
-  episodes/<ep>/pages/page-NNN.sheet.json  manga-7-pages  EPISODE
-  episodes/<ep>/prompts/page-NNN.prompt.txt    manga-7-pages
-  episodes/<ep>/prompts/page-NNN.negative.txt  manga-7-pages
+  episodes/<ep>/pages/page-NNN.sheet.json  manga-7-sheets EPISODE
+  episodes/<ep>/prompts/page-NNN.prompt.txt    manga-8-prompts
+  episodes/<ep>/prompts/page-NNN.negative.txt  manga-8-prompts
 ```

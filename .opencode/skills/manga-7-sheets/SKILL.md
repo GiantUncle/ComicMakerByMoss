@@ -1,15 +1,13 @@
 ---
-name: Manga 7 Pages
-description: Stage 7 of the manga pipeline, run once per episode block. Turns one block of 字コンテ into cut sheets at projects/<slug>/episodes/<ep>/pages/page-NNN.sheet.json and compiled prompts under episodes/<ep>/prompts/, with panel boxes from the layout templates and grammar validation. Use after the block's contis exist, or when the wizard hands over stage 7.
+name: Manga 7 Sheets
+description: Stage 7 of the manga pipeline, run once per episode block. Turns one block of 字コンテ into cut sheets at projects/<slug>/episodes/<ep>/pages/page-NNN.sheet.json with panel boxes from the layout templates and grammar validation. Use after the block's contis exist, or when the wizard hands over stage 7.
 ---
 
-# Stage 7 — Cut sheets and prompts
+# Stage 7 — Cut sheets
 
 **Requires** — `episodes/<ep>/pages/page-NNN.conti.json` for the block,
 `project.json`.
-**Produces** — `projects/<slug>/episodes/<ep>/pages/page-NNN.sheet.json`,
-`projects/<slug>/episodes/<ep>/prompts/page-NNN.prompt.txt`,
-`projects/<slug>/episodes/<ep>/prompts/page-NNN.negative.txt`.
+**Produces** — `projects/<slug>/episodes/<ep>/pages/page-NNN.sheet.json`.
 **Gate** — none; the block is done when every page validates with no warning.
 
 ## Steps
@@ -42,24 +40,15 @@ description: Stage 7 of the manga pipeline, run once per episode block. Turns on
    python ../manga-craft/scripts/compile_layout.py pages/page-NNN.sheet.json --check
    ```
 
-6. Compile, and attach the negative blocks:
-
-   ```bash
-   python ../manga-craft/scripts/compile_layout.py pages/page-NNN.sheet.json --output prompts/page-NNN.prompt.txt
-   python ../manga-craft/scripts/build_negative.py --style painterly --age adult > prompts/page-NNN.negative.txt
-   ```
-
-7. Keep whatever produces the sheets as a checked-in step that re-runs to
+6. Keep whatever produces the sheets as a checked-in step that re-runs to
    identical output from the conti and the template library, and fails on a
    grammar warning.
 
 ## Done when
 
 - Every sheet passes `compile_layout.py --check` with no warning.
-- Every prompt starts with the FKEY trigger when the adapter is in use, and
-  carries no `ref_id`.
-- Every negative file carries the three sectioned blocks.
+- Every sheet carries the panel boxes from the layout template, with no overlapping panels.
 
 ## Hand over
 
-Say the block is built, and ask for the next block, or start the review.
+Say the block's cut sheets are built, and ask for the next block, or start the review. Stage 8 compiles these sheets into prompts.

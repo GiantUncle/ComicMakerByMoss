@@ -89,7 +89,7 @@ export default function StageReview({
   block: number;
   refreshToken?: number;
   onRan?: () => void;
-  /** Step 7: jump to the manuscript preview with this page open. */
+  /** Step 8: jump to the manuscript preview with this page open. */
   onPickCut?: (page: number) => void;
   selectedPages?: number[];
   onTogglePage?: (page: number) => void;

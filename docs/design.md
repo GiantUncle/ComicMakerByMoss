@@ -269,9 +269,10 @@ output = 산출물 JSON
 | 4 | manga-4-refsheets | **프로젝트**(빠진 시트만) | `bible/characters/<name-slug>/sheet.*` | `bible/SHEETS_APPROVED` |
 | 5 | manga-5-plan | 에피소드 | `episodes/<ep>/plan/page-story-plan.json` | `episodes/<ep>/plan/APPROVED` |
 | 6 | manga-6-conti | 에피소드 | `episodes/<ep>/pages/page-NNN.conti.json` | — |
-| 7 | manga-7-pages | 에피소드 | `pages/page-NNN.sheet.json`, `prompts/` | — |
+| 7 | manga-7-sheets | 에피소드 | `episodes/<ep>/pages/page-NNN.sheet.json` | — |
+| 8 | manga-8-prompts | 에피소드 | `episodes/<ep>/prompts/` | — |
 
-2·3·4는 프로젝트에 한 번, 새 인물이 나올 때만 증분으로. 1·5·6·7은 에피소드마다(6·7은 4페이지 블록 단위).
+2·3·4는 프로젝트에 한 번, 새 인물이 나올 때만 증분으로. 1·5·6·7·8은 에피소드마다(6·7·8은 4페이지 블록 단위, 순서 콘티 → 컷 시트 → 프롬프트).
 
 ---
 
@@ -283,9 +284,9 @@ output = 산출물 JSON
 | **S1 프로젝트 설정** | 제목 3언어, 캔버스, 읽기방향, 기본 언어, 화풍, **컷 수 최소·최대(D13)** | 위저드 3단계 |
 | **S2 캐스트 풀** | 인물 카드 편집, 시트, 소품, **출연 이력** | 있음 |
 | **S3 에피소드 목록** | 화 목록, 진행률, [+ 새 에피소드] | 위저드·목록에 포함 |
-| **S4 에피소드 위저드** | 소스 → 캐스트 → 계획 → 컷, 단계별 실행·확인·리테이크 | 있음 |
-| **S5 페이지 워크벤치** | 컷 시트 + 콘티(3언어) + **원고 미리보기** + 템플릿 전환 | 있음 |
-| **S6 프롬프트 뷰어** | 완성 프롬프트, 언어 탭, 해상도, **컷 선택 리테이크** | 미리보기·워크벤치에 포함 |
+| **S4 에피소드 위저드** | 스토리 → 프로젝트 설정 → 캐스트 → 레퍼런스 시트 → 페이지 계획 → 콘티 → 컷 시트 → 프롬프트, 단계별 실행·확인·리테이크 | 있음 |
+| **S5 페이지 워크벤치** | 콘티(3언어) + 컷 시트 + 프롬프트 + **원고 미리보기** + 컷 선택 리테이크. 레이아웃(컷 분할)은 5단계 페이지 계획의 페이지별 ‘레이아웃’ 버튼에서 시각적으로 선택 | 있음 |
+| **S6 프롬프트 뷰어** | 완성 프롬프트, 언어 탭, 해상도, **컷 선택 리테이크** | 8단계 탭(프롬프트 컴파일 · 원고 미리보기 · 워크벤치)에 포함 |
 | **S7 스킬 편집기** | 편집본 편집 + **원본 보기 + 롤백(D12)** | 있음 |
 | **S8 프로바이더** | base URL·키·모델 | 있음 |
 | **S9 내보내기** | prompt/negative 묶음, 원고 이미지/PDF/CBZ | 남음 |
@@ -463,10 +464,11 @@ ComicMakerByMoss/
 | manga-2-project | 프로젝트 단위 유지. **`panels.min`/`panels.max` 추가(D13)**, `episodes` 배열 |
 | manga-3-bible | **풀 확장**으로 의미 변경 — 새 화의 새 인물만 추가 |
 | manga-4-refsheets | **빠진 시트만** 생성 |
-| manga-5-plan | 경로 변경. `cast` 부분집합을 읽고 **컷 수 범위를 강제** |
+| manga-5-plan | 경로 변경. `cast` 부분집합을 읽고 **컷 수 범위를 강제**. 레이아웃 선택 UI(페이지별 버튼 → visually picker → `template_suggestion` 저장) |
 | manga-6-conti | 경로 변경. 3언어 `lines` 생성. 컷 수 범위 강제 |
-| manga-7-pages | 컷 시트와 프롬프트를 저장. **언어·해상도 전환은 파생 컴파일**로 분리 |
-| manga-craft/pipeline.md | 경계표를 프로젝트/에피소드 2열로. §2.1 검증·리테이크 |
+| manga-7-sheets | 콘티 → `sheet.json`만. 결정적. 박스 좌표 생성 |
+| manga-8-prompts | `sheet.json` → `prompt.txt`/`negative.txt` 컴파일. 결정적. **언어·해상도 전환은 파생 컴파일**로 분리 |
+| manga-craft/pipeline.md | 8단계 경계표, §2.1 검증·리테이크, 콘티 → 컷 시트 → 프롬프트 순서 명시 |
 
 ---
 
