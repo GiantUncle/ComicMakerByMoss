@@ -104,8 +104,9 @@ def retake_cut(body: RetakeCutIn) -> dict:
             cuts=[{"page": body.page, "n": body.panel}], feedback=body.feedback or None,
         )
         sheet = runner.run(body.slug, "manga-7-sheets", ep=body.episode, pages=[body.page])
-        pages = runner.run(body.slug, "manga-8-prompts", ep=body.episode, pages=[body.page])
-        return {"conti": conti, "sheet": sheet, "page": pages}
+        art = runner.run(body.slug, "manga-8-artwork", ep=body.episode, pages=[body.page])
+        pages = runner.run(body.slug, "manga-9-prompts", ep=body.episode, pages=[body.page])
+        return {"conti": conti, "sheet": sheet, "art": art, "page": pages}
     except runner.StageError as e:
         raise HTTPException(409, str(e))
     except ProviderError as e:
@@ -150,7 +151,7 @@ class OrchestrateIn(BaseModel):
     slug: str
     episode: str | None = None
     from_n: int = 1
-    to_n: int = 8
+    to_n: int = 9
 
 
 @router.post("/orchestrate")

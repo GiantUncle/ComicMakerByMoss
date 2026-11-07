@@ -87,4 +87,5 @@ distribution is in `../manga-craft/character-consistency.md`.
 ## Hand over
 
 Say the block's contis are written, and that **stage 7 (`manga-7-sheets`)** builds
-that block's sheets, then stage 8 compiles them into prompts.
+that block's panels, **stage 8 (`manga-8-artwork`)** draws each page in words, and
+stage 9 compiles them into prompts.

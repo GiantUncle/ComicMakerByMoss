@@ -891,7 +891,148 @@ def _run_sheets(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages,
     return res
 
 
-# =========================================================== stage 8 prompts
+# ========================================================== stage 8 artwork
+def _pos_hint(bbox: list[float], width: int, height: int) -> str:
+    """Where a box sits on the page, in words — context for the artist."""
+    x1, y1, x2, y2 = bbox
+    cx = ((x1 + x2) / 2) / max(1, width)
+    cy = ((y1 + y2) / 2) / max(1, height)
+    band = "left" if cx < 0.34 else "right" if cx > 0.66 else "center"
+    row = "top" if cy < 0.34 else "bottom" if cy > 0.66 else "middle"
+    w, h = x2 - x1, y2 - y1
+    aspect = w / h if h else 1
+    shape = "wide horizontal" if aspect > 1.3 else "tall vertical" if aspect < 0.77 else "squarish"
+    return f"{row}-{band}, {shape}"
+
+
+def _artwork_check(conti: dict):
+    def check(data: dict) -> list[dict]:
+        return validate.validate_artwork(data, conti)
+    return check
+
+
+def _run_artwork(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, ids, cuts, block, episode_pages=None) -> dict:
+    """The artist: one finished page per model call, captions only (no geometry)."""
+    project = _read_json(root / "project.json")
+    plan = _read_json(root / "episodes" / ep / "plan" / "page-story-plan.json")
+    episode = _read_json(root / "episodes" / ep / "episode.json")
+    bible = _read_json(root / "bible" / "characters.json", {"characters": [], "objects": []})
+    page_total = int(plan.get("page_total", len(plan.get("pages", []))))
+    block = _block_from_pages(pages) if pages else block
+    wanted = list(pages) if pages else block_pages(page_total, block)
+
+    cards = {c["id"]: c for c in bible.get("characters", [])}
+    objects = {o["id"]: o for o in bible.get("objects", [])}
+    cast = [cards[c] for c in episode.get("cast", []) if c in cards]
+    art_style = str(project.get("art_style", ""))
+    size_w, size_h = build.tier_size(project.get("canvas", {}).get("tier", "M"))
+
+    system = _system_prompt(stage)
+    pages_dir = root / "episodes" / ep / "pages"
+    files: list[str] = []
+    issues: list[dict] = []
+
+    for n in wanted:
+        conti_path = pages_dir / f"page-{n:03d}.conti.json"
+        sheet_path = pages_dir / f"page-{n:03d}.sheet.json"
+        if not conti_path.is_file():
+            raise StageError(f"missing conti for page {n} — run stage 6 (콘티) first")
+        if not sheet_path.is_file():
+            raise StageError(f"missing cut sheet for page {n} — run stage 7 (컷 시트) first")
+        conti = _read_json(conti_path)
+        sheet = _read_json(sheet_path)
+
+        boxes = []
+        drawn_i = 0
+        for it in sheet.get("items", []):
+            if it.get("label") == "text":
+                boxes.append({"kind": "text", "id": it.get("ref_id"), "box": it.get("bbox")})
+            else:
+                drawn_i += 1
+                boxes.append({"kind": "panel", "n": drawn_i, "box": it.get("bbox")})
+
+        box_lines = "\n".join(
+            f"- {'panel ' + str(b['n']) if b['kind'] == 'panel' else 'text ' + str(b.get('id'))}: "
+            f"{_pos_hint(b['box'], size_w, size_h)}"
+            for b in boxes if isinstance(b.get("box"), list)
+        )
+
+        text_ids = [t.get("id") for t in conti.get("texts", [])]
+        user = (
+            f"# Project\n{_project_brief(project, episode)}\n\n"
+            f"# Cast cards — describe from these; never write a name\n"
+            f"{json.dumps(cast, ensure_ascii=False, indent=2)}\n\n"
+            f"# Objects that may be drawn\n"
+            f"{json.dumps(list(objects.values()), ensure_ascii=False, indent=2)}\n\n"
+            f"# This page's conti (the plan — your notes, not the page)\n"
+            f"{json.dumps(conti, ensure_ascii=False, indent=2)}\n\n"
+            f"# The page's boxes on a {size_w}x{size_h} canvas, in reading order\n"
+            f"{box_lines}\n\n"
+            f"# Page style hint\n{conti.get('style', '')}\n"
+            f"adapter/art style: {art_style}\n\n"
+            f"# Task\nYou are the manga artist. Draw page {n} in words.\n"
+            f"Write the whole page again — do not copy the conti's beats.\n"
+            f"Return exactly one object:\n"
+            "{\"page\": %d, \"summary_caption\": \"...\", "
+            "\"panels\": [{\"n\": <panel number>, \"caption\": \"...\"}], "
+            "\"texts\": [{\"id\": \"<text id>\", \"caption\": \"...\"}]}\n"
+            "Rules: one panels entry per panel (n must be 1..%d), one texts entry for "
+            "every text id %s. For a panel decide whether it carries the place or drops "
+            "it for the figure — only the panels that establish the place describe a "
+            "background. Say where inside the panel each figure stands and how two "
+            "people relate, in words. Fold light and texture into the sentence. Use the "
+            "cast card's descriptor for the panel that anchors a character and its "
+            "identifier_label elsewhere; never write a character's name. No coordinates, "
+            "no panel-position prefix like 'Top-left panel:', no instructions to the "
+            "model." % (n, drawn_i, json.dumps(text_ids, ensure_ascii=False))
+        )
+        if feedback:
+            user += f"\n\n# The user asks\n{feedback.strip()}"
+
+        if dry:
+            return {"dry": True, "system": system, "user": user,
+                    "note": f"artwork prompt for page {n}"}
+
+        data, page_issues = _ask_until_valid(stage, system, user, caller, _artwork_check(conti), feedback)
+        errs = validate.errors(page_issues)
+        issues += page_issues
+        if errs:
+            raise StageError(f"page {n} artwork still fails validation: " + _first_error(page_issues))
+        art_path = pages_dir / f"page-{n:03d}.art.json"
+        _write_json(art_path, data)
+        files.append(_rel(root, art_path))
+
+    return {"note": f"artwork for pages {wanted[0]}..{wanted[-1]}", "files": files, "issues": issues}
+
+
+def _apply_artwork(sheet: dict, art: dict) -> dict:
+    """Put the artist's captions onto the sheet's boxes. Boxes never move."""
+    out = json.loads(json.dumps(sheet))
+    summary = out.setdefault("summary", {})
+    if str(art.get("summary_caption", "")).strip():
+        summary["caption"] = str(art["summary_caption"]).strip()
+
+    panels = sorted(art.get("panels", []), key=lambda p: int(p.get("n", 0)))
+    captions = [str(p.get("caption", "")).strip() for p in panels]
+    texts = {t.get("id"): str(t.get("caption", "")).strip() for t in art.get("texts", [])}
+
+    drawn_i = 0
+    text_i = 0
+    for item in out.get("items", []):
+        if item.get("label") == "text":
+            cap = texts.get(item.get("ref_id"))
+            if cap is None and text_i < len(texts):
+                cap = list(texts.values())[text_i]
+            text_i += 1
+        else:
+            cap = captions[drawn_i] if drawn_i < len(captions) else None
+            drawn_i += 1
+        if cap:
+            item["caption"] = cap
+    return out
+
+
+# =========================================================== stage 9 prompts
 def _run_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, ids, cuts, block, episode_pages=None) -> dict:
     project = _read_json(root / "project.json")
     plan = _read_json(root / "episodes" / ep / "plan" / "page-story-plan.json")
@@ -907,9 +1048,17 @@ def _run_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages
 
     for n in wanted:
         sheet_path = pages_dir / f"page-{n:03d}.sheet.json"
+        art_path = pages_dir / f"page-{n:03d}.art.json"
         if not sheet_path.is_file():
             raise StageError(f"missing cut sheet for page {n} — run stage 7 (컷 시트) first")
-        draft = _read_json(sheet_path)
+        if not art_path.is_file():
+            raise StageError(f"missing artwork for page {n} — run stage 8 (만화가) first")
+        if art_path.stat().st_mtime < sheet_path.stat().st_mtime:
+            raise StageError(
+                f"artwork for page {n} is older than its panel boxes — "
+                "the page was re-boxed, so draw it again (stage 8)"
+            )
+        draft = _apply_artwork(_read_json(sheet_path), _read_json(art_path))
         draft_issues = validate.validate_draft(draft, project)
         issues += [i for i in draft_issues if i["code"] not in ("page.panel-count",)]
         prompt_text = build.compile_draft(draft)
@@ -935,7 +1084,7 @@ def _run_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages
     }
     if dry:
         res["system"] = "결정적 단계(코드 실행)입니다. AI 프롬프트가 없습니다."
-        res["user"] = f"컷 시트 → 최종 프롬프트 컴파일\n대상 페이지: {wanted}\n스타일: {style}\n출력: page-NNN.prompt.txt, page-NNN.negative.txt"
+        res["user"] = f"만화가 원고 → 프롬프트 컴파일\n대상 페이지: {wanted}\n스타일: {style}\n출력: page-NNN.prompt.txt, page-NNN.negative.txt"
     return res
 
 
@@ -947,7 +1096,8 @@ _RUNNERS = {
     "manga-5-plan": _run_plan,
     "manga-6-conti": _run_conti,
     "manga-7-sheets": _run_sheets,
-    "manga-8-prompts": _run_prompts,
+    "manga-8-artwork": _run_artwork,
+    "manga-9-prompts": _run_prompts,
 }
 
 
@@ -1114,14 +1264,15 @@ def retemplate(slug: str, ep: str, page: int, layout: dict) -> dict:
         raise StageError("that template does not fit this page: " + _first_error(issues))
 
     _write_json(path, conti)
+    # boxes are deterministic, so rebuild them here. The artist's captions were
+    # written for the old boxes, so they are left alone and go stale — the prompt
+    # stage refuses until the page is drawn again (a model call the user starts).
     sheet_result = run(slug, "manga-7-sheets", ep=ep, pages=[page])
-    prompt_result = run(slug, "manga-8-prompts", ep=ep, pages=[page])
     return {
         "conti": {"stage": "manga-6-conti", "note": f"page {page} · template {conti['layout'].get('template_id')}",
                   "files": [_rel(root, path)], "issues": issues},
         "sheet": sheet_result,
-        "page": prompt_result,
-        "prompt": prompt_result,
+        "needs_redraw": True,
     }
 
 
@@ -1140,7 +1291,9 @@ def _block_done(root: Path, ep: str, stage_id: str, block: int, page_total: int)
         return all((root / "episodes" / ep / "pages" / f"page-{n:03d}.conti.json").is_file() for n in pages)
     if stage_id == "manga-7-sheets":
         return all((root / "episodes" / ep / "pages" / f"page-{n:03d}.sheet.json").is_file() for n in pages)
-    if stage_id == "manga-8-prompts":
+    if stage_id == "manga-8-artwork":
+        return all((root / "episodes" / ep / "pages" / f"page-{n:03d}.art.json").is_file() for n in pages)
+    if stage_id == "manga-9-prompts":
         return all((root / "episodes" / ep / "prompts" / f"page-{n:03d}.prompt.txt").is_file() for n in pages)
     return False
 
@@ -1151,7 +1304,7 @@ def orchestrate(
     *,
     caller: Caller | None = None,
     from_n: int = 1,
-    to_n: int = 8,
+    to_n: int = 9,
 ) -> dict:
     """Run the table in order for one episode, stopping where a human must decide.
 
@@ -1251,7 +1404,12 @@ def review(slug: str, stage_id: str, *, ep: str | None = None, block: int = 1) -
                 p = root / "episodes" / ep / "pages" / f"page-{n:03d}.sheet.json"
                 if p.is_file():
                     files.append(_rel(root, p))
-        elif stage_id == "manga-8-prompts":
+        elif stage_id == "manga-8-artwork":
+            for n in wanted:
+                p = root / "episodes" / ep / "pages" / f"page-{n:03d}.art.json"
+                if p.is_file():
+                    files.append(_rel(root, p))
+        elif stage_id == "manga-9-prompts":
             for n in wanted:
                 for p in sorted((root / "episodes" / ep / "prompts").glob(f"page-{n:03d}*.prompt.txt")) if (root / "episodes" / ep / "prompts").is_dir() else []:
                     files.append(_rel(root, p))
@@ -1345,7 +1503,32 @@ def review(slug: str, stage_id: str, *, ep: str | None = None, block: int = 1) -
                           "template_suggestion": layout.get("template_id"),
                           "split": conti.get("split")})
         summary["pages"] = pages
-    elif stage_id == "manga-8-prompts" and ep:
+    elif stage_id == "manga-8-artwork" and ep:
+        plan = _read_json(root / "episodes" / ep / "plan" / "page-story-plan.json", {"page_total": 0})
+        page_total = int(plan.get("page_total", 0))
+        pages = []
+        for n in block_pages(page_total, block):
+            art_path = root / "episodes" / ep / "pages" / f"page-{n:03d}.art.json"
+            if not art_path.is_file():
+                continue
+            art = _read_json(art_path)
+            conti_path = root / "episodes" / ep / "pages" / f"page-{n:03d}.conti.json"
+            conti = _read_json(conti_path, {}) if conti_path.is_file() else {}
+            if conti:
+                issues += validate.validate_artwork(art, conti)
+            layout = conti.get("layout") or {}
+            pages.append({
+                "page": n,
+                "panels": len(art.get("panels", [])),
+                "texts": len(art.get("texts", [])),
+                "summary_caption": art.get("summary_caption"),
+                "panel_captions": art.get("panels", []),
+                "text_captions": art.get("texts", []),
+                "template_suggestion": layout.get("template_id"),
+                "split": conti.get("split"),
+            })
+        summary["pages"] = pages
+    elif stage_id == "manga-9-prompts" and ep:
         plan = _read_json(root / "episodes" / ep / "plan" / "page-story-plan.json", {"page_total": 0})
         page_total = int(plan.get("page_total", 0))
         pages = []

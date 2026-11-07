@@ -384,6 +384,73 @@ def validate_episode(contis: list[dict], project: dict | None = None) -> list[di
     return out
 
 
+# ------------------------------------------------------------------ artwork
+# Stage 8 is the artist: it rewrites the page as a drawing. It must not fall
+# back to the conti's own words, must not name the panel's position (the box
+# already says it, authoring-spec §10.1), and must not carry coordinates.
+POSITION_PREFIX = re.compile(
+    r"^(top|upper|bottom|lower|middle|main|center|centre|left|right)[ -]",
+    re.IGNORECASE,
+)
+COORDINATE_IN_CAPTION = re.compile(r"\[\s*-?\d")
+
+
+def validate_artwork(art: dict, conti: dict) -> list[dict]:
+    out: list[dict] = []
+    page = conti.get("page", "?")
+    where = f"page {page}"
+
+    if int(art.get("page", 0) or 0) != int(page or 0):
+        out.append(issue("error", "art.missing-page", where,
+                         f"artwork says page {art.get('page')!r} — it must be page {page}"))
+    if not str(art.get("summary_caption", "")).strip():
+        out.append(issue("error", "art.no-summary", where,
+                         "summary_caption is empty — the page needs its art direction"))
+
+    want_panels = {int(p.get("n", 0)) for p in conti.get("panels", [])}
+    beat_of = {int(p.get("n", 0)): str(p.get("beat", "")).strip() for p in conti.get("panels", [])}
+    seen_panels: set[int] = set()
+    for i, p in enumerate(art.get("panels", [])):
+        pw = f"{where}/panels[{i}]"
+        n = int(p.get("n", 0) or 0)
+        caption = str(p.get("caption", "")).strip()
+        if not caption:
+            out.append(issue("error", "art.empty-caption", pw, "panel caption is empty"))
+            continue
+        seen_panels.add(n)
+        if n not in want_panels:
+            out.append(issue("warning", "art.extra-panel", pw,
+                             f"panel {n} is not in the conti ({sorted(want_panels)})"))
+        if POSITION_PREFIX.match(caption):
+            out.append(issue("warning", "art.position-prefix", pw,
+                             "caption opens with a panel position — the box already says where"))
+        if COORDINATE_IN_CAPTION.search(caption):
+            out.append(issue("warning", "art.coordinates-in-caption", pw,
+                             "caption carries coordinates — those live in the box"))
+        if beat_of.get(n) and caption == beat_of[n]:
+            out.append(issue("warning", "art.conti-copied", pw,
+                             "caption is the conti's beat verbatim — the artist rewrites the page"))
+    for n in sorted(want_panels - seen_panels):
+        out.append(issue("error", "art.panel-missing", where, f"no caption for panel {n}"))
+
+    want_texts = {str(t.get("id")) for t in conti.get("texts", [])}
+    seen_texts: set[str] = set()
+    for i, t in enumerate(art.get("texts", [])):
+        tw = f"{where}/texts[{i}]"
+        tid = str(t.get("id"))
+        caption = str(t.get("caption", "")).strip()
+        if not caption:
+            out.append(issue("error", "art.empty-caption", tw, f"caption for text {tid!r} is empty"))
+            continue
+        seen_texts.add(tid)
+        if want_texts and tid not in want_texts:
+            out.append(issue("warning", "art.extra-text", tw,
+                             f"text {tid!r} is not in the conti"))
+    for tid in sorted(want_texts - seen_texts):
+        out.append(issue("error", "art.text-missing", where, f"no caption for text {tid!r}"))
+    return out
+
+
 # --------------------------------------------------------------------- plan
 def validate_plan(plan: dict, project: dict) -> list[dict]:
     out: list[dict] = []

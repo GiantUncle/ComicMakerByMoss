@@ -300,7 +300,7 @@ export default function Wizard({
             ))}
           </div>
 
-          {tab === "make" && renderStage("manga-8-prompts")}
+          {tab === "make" && renderStage("manga-9-prompts")}
 
           {tab === "preview" && (
             <Preview

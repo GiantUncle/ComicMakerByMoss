@@ -296,7 +296,7 @@ export const api = {
       `/api/stages?slug=${encodeURIComponent(slug)}` +
         (episode ? `&episode=${encodeURIComponent(episode)}` : "")
     ),
-  runStage: (body: { slug: string; stage: string; episode?: string | null; block?: number; dry?: boolean; episode_pages?: number | null }) =>
+  runStage: (body: { slug: string; stage: string; episode?: string | null; block?: number; dry?: boolean; episode_pages?: number | null; pages?: number[] }) =>
     req<StageRun>("/api/stages/run", { method: "POST", body: JSON.stringify(body) }),
 
   stageReview: (slug: string, stage: string, episode?: string | null, block = 1) =>

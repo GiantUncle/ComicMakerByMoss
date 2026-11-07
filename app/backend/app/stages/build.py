@@ -408,6 +408,9 @@ def build_page(
             ),
             "text": body,
             "bbox": bbox,
+            # wiring key: stage 8 keys its lettering captions by this id, and
+            # compile_layout drops it before the prompt is written
+            "ref_id": entry.get("id"),
         })
 
     style = str(conti.get("style", "")).strip()

@@ -46,6 +46,9 @@ interface PageRow {
   width?: number;
   height?: number;
   conti?: any;
+  summary_caption?: string;
+  panel_captions?: { n: number; caption: string }[];
+  text_captions?: { id: string; caption: string }[];
 }
 
 interface CastRow {
@@ -84,6 +87,7 @@ export default function StageReview({
 }) {
   const [review, setReview] = useState<StageReview | null>(null);
   const [sheetsReview, setSheetsReview] = useState<StageReview | null>(null);
+  const [artReview, setArtReview] = useState<StageReview | null>(null);
   const [pool, setPool] = useState<BiblePool | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +110,7 @@ export default function StageReview({
     // same conti, so the conti view shows both, per page.
     if (stage === "manga-6-conti") {
       api.stageReview(slug, "manga-7-sheets", ep, block).then(setSheetsReview).catch(() => setSheetsReview(null));
+      api.stageReview(slug, "manga-8-artwork", ep, block).then(setArtReview).catch(() => setArtReview(null));
     }
   };
 
@@ -131,6 +136,9 @@ export default function StageReview({
       api.stageReview(slug, "manga-7-sheets", ep, block)
         .then((r) => alive && setSheetsReview(r))
         .catch(() => alive && setSheetsReview(null));
+      api.stageReview(slug, "manga-8-artwork", ep, block)
+        .then((r) => alive && setArtReview(r))
+        .catch(() => alive && setArtReview(null));
     }
     return () => {
       alive = false;
@@ -208,6 +216,11 @@ export default function StageReview({
       : [];
   const sheetByPage = new Map(sheetRows.map((r) => [r.page, r]));
   const sheetIssues = sheetsReview?.issues ?? [];
+  const artRows: PageRow[] =
+    stage === "manga-6-conti" && Array.isArray(artReview?.summary?.pages)
+      ? ((artReview.summary.pages as PageRow[]))
+      : [];
+  const artByPage = new Map(artRows.map((r) => [r.page, r]));
   const castRows: CastRow[] = Array.isArray(review.summary.cast)
     ? (review.summary.cast as CastRow[])
     : [];
@@ -268,10 +281,12 @@ export default function StageReview({
               }}
             />
           ) : stage === "manga-6-conti" ? (
-            <ContiBlockView rows={rows} block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} sheetByPage={sheetByPage} sheetIssues={sheetIssues} sheetsErrorCount={sheetsReview?.error_count ?? 0} />
+            <ContiBlockView rows={rows} block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} sheetByPage={sheetByPage} sheetIssues={sheetIssues} sheetsErrorCount={sheetsReview?.error_count ?? 0} artByPage={artByPage} />
           ) : stage === "manga-7-sheets" ? (
             <BlockMade rows={rows} label="컷 시트" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
-          ) : stage === "manga-8-prompts" ? (
+          ) : stage === "manga-8-artwork" ? (
+            <ArtworkMade rows={rows} block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
+          ) : stage === "manga-9-prompts" ? (
             <BlockMade rows={rows} label="프롬프트" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
           ) : (
             <BlockMade rows={rows} label="현재 결과" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
@@ -561,6 +576,7 @@ function ContiBlockView({
   sheetByPage,
   sheetIssues,
   sheetsErrorCount,
+  artByPage,
 }: {
   rows: PageRow[];
   block: number;
@@ -569,6 +585,7 @@ function ContiBlockView({
   sheetByPage?: Map<number, PageRow>;
   sheetIssues?: ReviewIssue[];
   sheetsErrorCount?: number;
+  artByPage?: Map<number, PageRow>;
 }) {
   const [layouts, setLayouts] = useState<Map<string, LayoutBox[]>>(new Map());
 
@@ -691,6 +708,114 @@ function ContiBlockView({
                 {!conti && <p className="muted" style={{ fontSize: "var(--text-sm)", margin: 0 }}>콘티 상세 데이터가 없습니다(새로고침 또는 다시 실행 후 확인).</p>}
               </div>
             </details>
+
+            {/* the artist's page — what each panel is actually drawn as */}
+            {artByPage?.get(r.page) && (
+              <details style={{ marginTop: "var(--s-2)" }} onClick={(e) => e.stopPropagation()}>
+                <summary style={{ cursor: "pointer", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                  만화가가 그린 원고 (페이지 아트 디렉션 · 컷별 묘사)
+                </summary>
+                <div className="stack" style={{ gap: "var(--s-2)", marginTop: "var(--s-2)" }}>
+                  {artByPage.get(r.page)!.summary_caption && (
+                    <pre className="rules-pre" style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+                      {artByPage.get(r.page)!.summary_caption}
+                    </pre>
+                  )}
+                  {(artByPage.get(r.page)!.panel_captions ?? []).map((p) => (
+                    <div key={`a-${p.n}`} className="card" style={{ padding: "8px 10px", fontSize: "var(--text-sm)" }}>
+                      <span className="chip mono">컷 {p.n}</span>
+                      <div style={{ marginTop: 4 }}>{p.caption}</div>
+                    </div>
+                  ))}
+                  {(artByPage.get(r.page)!.text_captions ?? []).map((t) => (
+                    <div key={`at-${t.id}`} className="card" style={{ padding: "8px 10px", fontSize: "var(--text-sm)" }}>
+                      <span className="chip mono">{t.id}</span>
+                      <div style={{ marginTop: 4 }}>{t.caption}</div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Stage 8 — the artist's page. What you read here is the page as it will be
+ * drawn: the summary brief, then one caption per panel and per lettering box.
+ */
+function ArtworkMade({
+  rows,
+  block,
+  selectedPages,
+  onTogglePage,
+}: {
+  rows: PageRow[];
+  block: number;
+  selectedPages?: number[];
+  onTogglePage?: (page: number) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        title={`이 블록(${(block - 1) * 4 + 1}–${block * 4}p)에 아직 원고가 없습니다.`}
+        hint="콘티를 실행하면 컷 시트와 함께 만화가가 각 페이지를 그립니다."
+      />
+    );
+  }
+  return (
+    <div className="stack" style={{ gap: "var(--s-3)" }}>
+      <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
+        원고 — 만화가가 콘티를 보고 그린 페이지입니다. 카드를 눌러 선택하면 그 페이지만 다시 그립니다.
+      </span>
+      {rows.map((r) => {
+        const panels = Array.isArray(r.panel_captions) ? r.panel_captions : [];
+        const texts = Array.isArray(r.text_captions) ? r.text_captions : [];
+        return (
+          <article
+            key={r.page}
+            className="card"
+            onClick={onTogglePage ? () => onTogglePage(r.page) : undefined}
+            style={{
+              padding: "var(--s-3)",
+              cursor: onTogglePage ? "pointer" : undefined,
+              outline: onTogglePage && selectedPages?.includes(r.page) ? "2px solid var(--primary)" : undefined,
+              outlineOffset: 1,
+            }}
+          >
+            <div className="row" style={{ gap: "var(--s-2)", alignItems: "center", flexWrap: "wrap" }}>
+              <span className="plan-card-page mono">{r.page}p</span>
+              <span className="chip">컷 {panels.length}</span>
+              <span className="chip">텍스트 {texts.length}</span>
+              {r.template_suggestion && <span className="chip mono">{r.template_suggestion}</span>}
+            </div>
+
+            {r.summary_caption && (
+              <div style={{ marginTop: "var(--s-2)" }}>
+                <div className="muted" style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: 4 }}>
+                  페이지 아트 디렉션
+                </div>
+                <pre className="rules-pre" style={{ maxHeight: 160, whiteSpace: "pre-wrap" }}>{r.summary_caption}</pre>
+              </div>
+            )}
+
+            <div className="rows" style={{ marginTop: "var(--s-2)" }}>
+              {panels.map((p) => (
+                <div key={`p-${p.n}`} className="card" style={{ padding: "8px 10px", fontSize: "var(--text-sm)" }}>
+                  <span className="chip mono">컷 {p.n}</span>
+                  <div style={{ marginTop: 4 }}>{p.caption}</div>
+                </div>
+              ))}
+              {texts.map((t) => (
+                <div key={`t-${t.id}`} className="card" style={{ padding: "8px 10px", fontSize: "var(--text-sm)" }}>
+                  <span className="chip mono">{t.id}</span>
+                  <div style={{ marginTop: 4 }}>{t.caption}</div>
+                </div>
+              ))}
+            </div>
           </article>
         );
       })}

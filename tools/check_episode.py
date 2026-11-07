@@ -8,6 +8,7 @@ It reads what stage 5 and stage 6/7 actually wrote and reports every problem:
   - a layout used on two pages of the episode (a layout belongs to one page)
   - a page whose layout disagrees with the panels written for it
   - a layout whose shape disagrees with the page's split (even / single)
+  - an artwork page that misses a panel or a text, or names a panel position
   - a prompt that is not parseable, or is missing a required field
   - a text box or panel box that leaves the canvas
 
@@ -53,6 +54,22 @@ def check(slug: str, ep: str) -> list[dict]:
         issues += validate.validate_conti(conti, project)
 
     issues += validate.validate_episode(contis, project)
+
+    # ---- artwork: the artist's page must cover every panel and text
+    conti_by_page = {int(c.get("page", 0)): c for c in contis}
+    for art_path in sorted(pages_dir.glob("page-*.art.json")):
+        try:
+            art = json.loads(art_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            issues.append(validate.issue("error", "art.bad-json", art_path.name,
+                                         f"artwork is not parseable: {exc}"))
+            continue
+        conti = conti_by_page.get(int(art.get("page", 0) or 0))
+        if conti is None:
+            issues.append(validate.issue("warning", "art.no-conti", art_path.name,
+                                         "artwork has no matching conti page"))
+            continue
+        issues += validate.validate_artwork(art, conti)
 
     # ---- the same check, straight off the layout boxes
     seen: dict[str, int] = {}

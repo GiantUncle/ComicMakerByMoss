@@ -58,7 +58,7 @@ export default function Workbench({
         setPrompt(r.prompt);
         setTemplateId(r.layout.template_id ?? "");
         setPanelCount(r.panel_count);
-        setHistory(h.filter((s) => s.stage === "manga-6-conti" || s.stage === "manga-7-sheets" || s.stage === "manga-8-prompts"));
+        setHistory(h.filter((s) => s.stage === "manga-6-conti" || s.stage === "manga-7-sheets" || s.stage === "manga-8-artwork" || s.stage === "manga-9-prompts"));
       })
       .catch((e) => setError(String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps

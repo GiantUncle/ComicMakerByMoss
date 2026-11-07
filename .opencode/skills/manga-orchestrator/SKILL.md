@@ -78,7 +78,8 @@ stage runs once, an episode stage runs once per episode.
 | 5 | `manga-5-plan` | episode | `episodes/<ep>/plan/page-story-plan.json` |
 | 6 | `manga-6-conti` | episode | `episodes/<ep>/pages/page-NNN.conti.json` |
 | 7 | `manga-7-sheets` | episode | `episodes/<ep>/pages/*.sheet.json` |
-| 8 | `manga-8-prompts` | episode | `episodes/<ep>/prompts/` |
+| 8 | `manga-8-artwork` | episode | `episodes/<ep>/pages/*.art.json` |
+| 9 | `manga-9-prompts` | episode | `episodes/<ep>/prompts/` |
 
 How to dispatch each:
 
@@ -86,7 +87,8 @@ How to dispatch each:
 | --- | --- |
 | 0 `start-wizard` | load and run it here — it is interactive, so relay its questions |
 | 1-5 | load the stage skill and follow it here, once each, in order |
-| 6-8 | one worker per **block of 4 pages**, in order conti → sheets → prompts, because stage 5 fixed what each page does |
+| 6-9 | one worker per **block of 4 pages**, in order conti → sheets → artwork → prompts, because stage 5 fixed what each page does |
+| 8 `manga-8-artwork` | the artist works **one page at a time** — one page is one finished drawing |
 
 For a block, hand a worker exactly three lines — the skill, the project, the
 block — and let it read the rest from disk:
@@ -128,9 +130,10 @@ stop and report.
 | 5 plan | `app.stages.validate.validate_plan(plan, project)` | `plan.no-page-total` `plan.not-multiple-of-4` `plan.page-count` `plan.no-story-job` `plan.no-reader-state` `plan.panel-target` `plan.bad-split` `plan.shape-mismatch` `plan.bad-template`(warn) `plan.no-hook` `plan.focus-on-even` `plan.missing-focus` `plan.repeat-layout` |
 | 6 conti (per block) | `app.stages.validate.validate_conti(conti, project)` per page; after the block run `app.stages.validate.validate_episode(all_contis_in_episode, project)` | `conti.no-story-job` `conti.bad-tier` `conti.bad-reading` `conti.no-panels` `conti.bad-template` `conti.panel-mismatch` `layout.wrong-shape` `conti.panel-count` `conti.panel-no-beat` `conti.panel-no-tier` `conti.anchor-count` `conti.dup-text-id` `conti.bad-kind` `conti.bad-bubble` `conti.bad-panel-ref` `conti.missing-lang` `conti.line-count` `conti.text-box-off-canvas` `episode.no-layout` `episode.repeat-layout` |
 | 7 sheets (per block) | `../manga-craft/scripts/compile_layout.py <sheet> --check` **and** `app.stages.validate.validate_draft(draft, project)` per `page-NNN.sheet.json` | `canvas.bad` `canvas.not-multiple-16` `summary.no-caption` `items.empty` `item.not-object` `item.unknown-field` `item.bad-label` `item.no-caption` `item.bad-bbox` `item.text-empty` `panels.overlap` `item.ref-id-leaked` (on prompt) — **no warning allowed** (`item.text-too-small` `page.panel-count` `page.detail-cuts` count as fail for build) |
-| 8 prompts (per block) | compile is re-run; `app.stages.validate.validate_prompt(prompt_obj, w, h, project)` per `page-NNN.prompt.txt`; `page-NNN.negative.txt` has the three blocks (`painterly`/`clean`/`lineart` + age) | `summary.no-caption` `prompt.coord-space` `item.*` (above, with `compiled=True`: **no `ref_id`** allowed — `item.ref-id-leaked`) FKEY trigger present; negative three sections present — **no warning allowed** |
+| 8 artwork (per page) | `app.stages.validate.validate_artwork(art, conti)` per `page-NNN.art.json` | `art.missing-page` `art.no-summary` `art.panel-missing` `art.text-missing` `art.empty-caption` (warn: `art.position-prefix` `art.conti-copied` `art.names-a-person`) |
+| 9 prompts (per block) | compile is re-run; `app.stages.validate.validate_prompt(prompt_obj, w, h, project)` per `page-NNN.prompt.txt`; `page-NNN.negative.txt` has the three blocks (`painterly`/`clean`/`lineart` + age) | `summary.no-caption` `prompt.coord-space` `item.*` (above, with `compiled=True`: **no `ref_id`** allowed — `item.ref-id-leaked`) FKEY trigger present; negative three sections present — **no warning allowed** |
 
-Episode-wide net — after stages 5–8, and before the wrap, run the same tool the
+Episode-wide net — after stages 5–9, and before the wrap, run the same tool the
 GUI checks use so plan, conti, layout reuse and prompt geometry are checked together:
 
 ```
@@ -142,7 +145,7 @@ failing pages (see `pipeline.md` §2.1 retake scope), re-run the script, and
 only continue when it passes. Warnings (`item.text-too-small`,
 `page.panel-count`, `page.detail-cuts`, `plan.bad-template`,
 `bible.name-langs`, `conti.no-text-box`) must be **reported verbatim** in the
-pass line, and for stages 7–8 they block the build exactly as the GUI build does.
+pass line, and for stages 7–9 they block the build exactly as the GUI build does.
 
 Example invocations (run from repo root):
 
@@ -181,7 +184,7 @@ Run the manga orchestrator for talk-show.
 Run to the plan.               (stops after stage 5)
 Run from the conti.            (starts at stage 6)
 Only rebuild block 3 of ep02.
-Just add episode 3.            (runs stages 1, 3, 4, 5, 6, 7, 8 for the new episode)
+Just add episode 3.            (runs stages 1, 3, 4, 5, 6, 7, 8, 9 for the new episode)
 ```
 
 Honor the scope, and say at the top which stages this run will cover.

@@ -69,7 +69,20 @@ STAGES: tuple[Stage, ...] = (
         requires=("episodes/{ep}/plan/APPROVED",),
     ),
     Stage(
-        id="manga-8-prompts", n=8, scope="episode", mode="deterministic", per_block=True,
+        id="manga-8-artwork", n=8, scope="episode", mode="model", per_block=True,
+        produces=("episodes/{ep}/pages/page-{block}*.art.json",),
+        gate=None,
+        # the sheet is checked at run time (it is per page, not a gate file)
+        requires=("episodes/{ep}/plan/APPROVED", "bible/APPROVED"),
+        craft=(
+            "comic-planning.md",
+            "character-consistency.md",
+            "authoring-spec.md",
+            "verified-examples.md",
+        ),
+    ),
+    Stage(
+        id="manga-9-prompts", n=9, scope="episode", mode="deterministic", per_block=True,
         produces=("episodes/{ep}/prompts/page-{block}*.prompt.txt",),
         gate=None,
         requires=("episodes/{ep}/plan/APPROVED",),
@@ -139,7 +152,7 @@ def _page_no(p: Path) -> int | None:
 
 
 def _episode_page_files(root: Path, ep: str, kind: str) -> dict[int, Path]:
-    """Map page -> file for one kind (conti|sheet|prompt) of an episode."""
+    """Map page -> file for one kind (conti|sheet|art|prompt) of an episode."""
     if kind == "prompt":
         d = root / "episodes" / ep / "prompts"
         if not d.is_dir():
@@ -149,7 +162,7 @@ def _episode_page_files(root: Path, ep: str, kind: str) -> dict[int, Path]:
     d = root / "episodes" / ep / "pages"
     if not d.is_dir():
         return {}
-    ext = {"conti": "conti.json", "sheet": "sheet.json"}[kind]
+    ext = {"conti": "conti.json", "sheet": "sheet.json", "art": "art.json"}[kind]
     return {n: p for p in d.glob(f"page-*.{ext}")
             if (n := _page_no(p)) is not None}
 
@@ -160,14 +173,16 @@ def stale_pages(root: Path, ep: str, stage_id: str, block: int | None = None) ->
     Chains (conservative — any upstream newer marks the page stale):
       manga-6-conti    : plan        > conti
       manga-7-sheets   : plan|conti  > sheet
-      manga-8-prompts  : plan|conti|sheet > prompt
+      manga-8-artwork  : plan|conti|sheet > art
+      manga-9-prompts  : plan|conti|sheet|art > prompt
     Empty when the stage has no such dependency or the page has no output yet.
     """
-    if stage_id not in ("manga-6-conti", "manga-7-sheets", "manga-8-prompts"):
+    if stage_id not in ("manga-6-conti", "manga-7-sheets", "manga-8-artwork", "manga-9-prompts"):
         return []
     plan_m = _mtime(root / "episodes" / ep / "plan" / "page-story-plan.json")
     contis = _episode_page_files(root, ep, "conti")
     sheets = _episode_page_files(root, ep, "sheet")
+    arts = _episode_page_files(root, ep, "art")
     prompts = _episode_page_files(root, ep, "prompt")
 
     def in_block(n: int) -> bool:
@@ -191,6 +206,12 @@ def stale_pages(root: Path, ep: str, stage_id: str, block: int | None = None) ->
         up = [plan_m, _mtime(contis[n]) if n in contis else None]
         return older(_mtime(p), up) or conti_stale_for(n)
 
+    def art_stale_for(n: int) -> bool:
+        p = arts.get(n)
+        if p is None:
+            return False
+        return older(_mtime(p), [plan_m]) or conti_stale_for(n) or sheet_stale_for(n)
+
     out: list[int] = []
     if stage_id == "manga-6-conti":
         for n, p in sorted(contis.items()):
@@ -200,14 +221,20 @@ def stale_pages(root: Path, ep: str, stage_id: str, block: int | None = None) ->
         for n in sorted(sheets):
             if in_block(n) and sheet_stale_for(n):
                 out.append(n)
-    else:  # manga-8-prompts
+    elif stage_id == "manga-8-artwork":
+        for n in sorted(arts):
+            if in_block(n) and art_stale_for(n):
+                out.append(n)
+    else:  # manga-9-prompts
         for n, p in sorted(prompts.items()):
             if not in_block(n):
                 continue
             up = [plan_m,
                   _mtime(contis[n]) if n in contis else None,
-                  _mtime(sheets[n]) if n in sheets else None]
-            if older(_mtime(p), up) or conti_stale_for(n) or sheet_stale_for(n):
+                  _mtime(sheets[n]) if n in sheets else None,
+                  _mtime(arts[n]) if n in arts else None]
+            if (older(_mtime(p), up) or conti_stale_for(n) or sheet_stale_for(n)
+                    or art_stale_for(n)):
                 out.append(n)
     return out
 

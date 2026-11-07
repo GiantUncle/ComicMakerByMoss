@@ -6,8 +6,7 @@
  * 3 캐스트 (project)
  * 4 레퍼런스 시트 (project)
  * 5 페이지 계획 (episode)
- * 6 콘티 (episode)      — AI: 장면·대사·내레이션·효과음(KO/EN/JA)
- *        컷 시트와 프롬프트는 같은 단계에서 자동 생성됩니다
+ * 6 콘티 (episode)      — AI 설계 + 만화가가 페이지를 그림 + 코드가 프롬프트로 내보냄
  * 7 프롬프트 (episode)  — 원고 미리보기/워크벤치 (+ MOSS-Image 프롬프트)
  *
  * Internal creation state may still use step 1 in the wizard when no project exists.
@@ -73,16 +72,16 @@ export const STEPS: StepMeta[] = [
     label: "콘티",
     scope: "episode",
     blurb:
-      "AI가 페이지 계획대로 각 페이지를 그리는 단계입니다. 컷마다 샷 · 앵글 · 행동(beat)을 적고, 말풍선 · 내레이션 · 효과음 대사를 한국어 · 영어 · 일본어로 동시에 직접 씁니다(번역이 아닙니다). 4페이지씩 블록으로 만듭니다. 콘티가 끝나면 컷 시트와 프롬프트가 같은 단계에서 자동 생성됩니다.",
-    stages: ["manga-6-conti", "manga-7-sheets"],
+      "설계도(콘티)를 그리는 단계입니다. 컷마다 샷 · 앵글 · 행동(beat)과 대사·내레이션·효과음 3개국어를 적고, 이어서 만화가가 그 콘티를 보고 각 페이지를 실제로 그립니다 — 컷마다 무엇이 어떻게 보이는지, 배경을 넣을지 인물만 강조할지, 누가 어디에 서는지, 빛과 표정까지. 4페이지씩 블록으로 만듭니다.",
+    stages: ["manga-6-conti", "manga-7-sheets", "manga-8-artwork", "manga-9-prompts"],
   },
   {
     n: 7,
     label: "프롬프트",
     scope: "episode",
     blurb:
-      "컷 시트를 MOSS-Image가 바로 읽을 수 있는 프롬프트(prompt.txt · negative.txt)로 컴파일하는 단계입니다. 언어를 바꾸면 이 단계에서 다시 컴파일하며, 번역하지 않습니다. 원고 미리보기와 워크벤치도 이 단계 안에서 봅니다.",
-    stages: ["manga-8-prompts"],
+      "만화가가 그린 페이지를 MOSS-Image가 바로 읽는 프롬프트(prompt.txt · negative.txt)로 내보내는 단계입니다. 언어를 바꾸면 여기서 다시 내보내며, 번역하지 않습니다. 원고 미리보기와 워크벤치도 이 단계 안에서 봅니다.",
+    stages: ["manga-9-prompts"],
   },
 ];
 
