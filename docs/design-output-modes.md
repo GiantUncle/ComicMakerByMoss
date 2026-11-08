@@ -134,18 +134,24 @@ negative.txt =  build.negative("clean")
 ### 3.3 프롬프트 컴파일 (신규 `build.compile_single_frame`)
 
 ```
-summary.caption = style + 캐스트 요약 앵커(등장 인물 identifier + anchors)
+summary.caption = style + 캐스트 인덱스(등장 인물 identifier_label + anchors + signature)
 summary.meta    = ["comic", "single", "digital_painting"]
 summary.canvas  = "single"
 items = [
-  { label: "character", caption: "<scene> [<descriptor> — 그 인물의 첫 프레임에만]", bbox: frame_bbox },
+  { label: "character", caption: "<descriptor — 앵커 인물의 정본 묘사> <scene>", bbox: frame_bbox },
   { label: "text", caption: text_caption(kind,bubble,vertical,tail), text: lines[lang], bbox }
 ]
 negative.txt = build.negative("painterly")
 ```
 
-- **FULL 묘사는 인물마다 첫 프레임에 딱 한 번.** 이후 프레임은 `summary.caption`의 캐스트
-  총표 + `identifier_label` 로 이어간다(`reference-prompts/README.md` §3 (b)).
+- **`anchor_of` 프레임은 항상 그 인물의 `descriptor` 전문을 담는다.** R-A 는 "한 페이지당 인물
+  묘사 정확히 1회"이고 **한 페이지 = 한 프레임**이므로, 프레임마다 전문이 들어간다
+  (`character-consistency.md` R-A, R-D). 요약의 캐스트 인덱스는 **포인터**(이름·앵커)일 뿐,
+  묘사를 대신하지 않는다. **사람을 라벨/`ref_id`로 대신 표현하지 않는다.**
+- 묘사는 캡션 **앞머리**에 온다 — §9가 요구하는 `Apparent age group:` 헤드가 캡션 중간에 박히지
+  않도록. 장면/행동은 묘사 뒤에 온다.
+- 말풍선 꼬리는 캐릭터의 `identifier_label`을 가리킨다(R-C) — raw 카드 id(`young-woman`)는
+  프롬프트에 나가지 않는다.
 - `anchor_of` 가 있는 프레임의 `label` 은 `character`(모델이 인물로 취급하도록). 없으면 `object`.
 - 캐스트 묘사·앵커 규칙은 `character-consistency.md`·A/C 레퍼런스 README §1 을 따른다.
 - 컴파일은 `canvas: single`(Type C)이며 `validate_prompt`(기존)로 검증한다.

@@ -28,9 +28,9 @@ Read `../manga-craft/twitter-comic.md` first — it is the mode brief.
 {
   "page": 1,
   "moment": "the still the reader sees — who is where and what the frame holds",
-  "change": "page 2 onward: what shifted from the previous frame (a hand, the face, the zipper)",
+  "change": "page 2 onward: what shifted from the previous frame (a hand moves, the face changes, one small thing alters)",
   "dialogue_intent": "what is being said and by whom — the line's job, not its words",
-  "place": "cafe_interior"
+  "place": "setting id, e.g. room_interior"
 }
 ```
 

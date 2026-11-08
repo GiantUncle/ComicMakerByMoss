@@ -40,7 +40,8 @@
   공유하고 comic 전용 7단계를 쓴다:
   `comic-1-brief → … → comic-5-plan → comic-6-scene → comic-7-prompts`.
   결과는 Type C Layout JSON(`summary.canvas: "single"`). 인물은 만화와 같은 캐스트·시트로
-  고정하고, 페이지마다 인물의 FULL 묘사는 첫 프레임에 한 번만 넣는다.
+  고정한다. 한 페이지=한 프레임이므로 **프레임마다** 그 인물의 `descriptor` 전문이 들어간다
+  (R-A: 한 페이지당 묘사 1회). 요약의 캐스트 인덱스는 포인터일 뿐 묘사를 대신하지 않는다.
   `registry.STAGES_BY_MODE` 가 모드별 단계 목록이다.
 - **illustration** — 프로젝트가 **아니다.** 상단바의 `Illustration` 탭이 여는 즉석 도구다.
   명령 → Type B 섹션 프롬프트(`<|artist|>… <|style_and_aesthetic|>… <|region|>…`). 결과는

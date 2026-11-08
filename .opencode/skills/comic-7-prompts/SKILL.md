@@ -21,9 +21,11 @@ scene drew with the canvas, and emits the prompt.
    - `summary.canvas` is `"single"`; `summary.meta` is
      `["comic", "single", "digital_painting"]`.
    - `summary.caption` is the page's style line plus the cast index (the
-     `identifier_label` of the characters present).
-   - one **frame item** (`character`/`object`) whose caption is the page's
-     `scene`, with the anchor character's descriptor appended;
+     `identifier_label` and anchors of every character in the page's
+     `characters`).
+   - one **frame item** (`character`/`object`) whose caption is, lead first,
+     the full `descriptor` of every character in `characters`, then the page's
+     `scene`;
    - one **text item** per lettering entry: `text` is `lines[lang]`, the caption
      is the treatment (`comic-planning.md` §6.0).
 

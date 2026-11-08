@@ -44,17 +44,66 @@ coordinates, and you never state them. You decide what is *drawn inside* them.
      panels drop the background and hold the figure. The conti's `bg` is a hint
      id, not prose — turn it into a described setting when the panel carries it,
      and omit it when the panel drops it. Never write an id.
-   - **Light, mood, texture.** Fold these into the sentence the way a manga does
-     — where the light comes from, what catches it — not as a settings list.
-   - **The figure.** Use the cast card: `descriptor` for the panel that anchors
-     the character, `identifier_label` for every other appearance. A person is
-     described, **never named** — a name is only written where the name itself is
-     drawn (a name tag, a sign), and then it is lettering, not caption.
+   - **Light and surface.** Fold them into the sentence the way a manga does:
+     where the light comes from, and what catches it — skin, leather, glass,
+     foil, dust. Never name the medium or the technique in a panel: `painterly`,
+     `brushwork`, `watercolor`, `gouache`, `lineart`, `photographic` are the
+     summary's words. A panel caption that says *rendered in textured brushwork*
+     has said nothing about what is drawn.
+   - **The figure.** The cast card's `descriptor` goes onto the anchor panel
+     **word for word** — do not recompose it, do not lead with the pose, and keep
+     its opening `Apparent age group:` head. One recomposed descriptor yields a
+     different face every page.
+
+     A part-only frame — an extreme close-up on a hand, the eyes, the mouth — is
+     an `object`, never a `character`, and it carries only that part; it can grow
+     a head. Leave the full descriptor to the frame where the figure is the
+     subject (`authoring-spec.md` §10.6.1).
+
+     A re-appearance carries the label and **at most one** anchor. Three anchors
+     on the second appearance is a second descriptor by another name. Every other appearance carries the card's
+     `identifier_label` **plus one of its anchors** — never a bare pronoun.
+     Type A writes *the bald traveler*, *the petite 15-year-old
+     sailor-uniform schoolgirl*; a pronoun with nothing to hold on to drifts
+     from panel to panel.
+
+     When the card carries an `age_phrase`, write the anti-drift clause into the
+     drawing, the way Type A does — what the figure is **not**: *neither a
+     big-headed 10-year-old child nor a mature 20-year-old woman*. The card's
+     `age_phrase`, `body` and `default_outfit` are part of the figure.
+
+     State each attribute **once on the page**. The signature — the mole, the
+     CRT head — is named in the descriptor and nowhere else; if the action clause
+     already names an attribute (the dark suit, the ink markings), the descriptor
+     that follows does not repeat it, and no other panel repeats the anchor.
+
+     A person is described, **never named** — a name is only written where the
+     name itself is drawn (a name tag, a sign), and then it is lettering, not
+     caption.
 
 3. Write the page's **summary brief** (`summary_caption`): one dense paragraph of
-   medium, rendering, palette, light, mood and subject count for the whole page,
-   the way Type A/C in `verified-examples.md` opens. This is the page's art
-   direction.
+   medium, rendering, palette, light, subject count and **skin tone** — the way
+   Type A/C in `verified-examples.md` opens. Two more things belong in it:
+
+   - **How the lettering is rendered.** Type A fixes it here: *crisp Chinese
+     comic dialogue text in clean speech bubbles*. Name this page's own
+     language(s) from `project.json` → `languages.all`, by name (Korean,
+     English, Japanese).
+   - The page's **cast index** under it, one line per figure on the page in the
+     form `the young woman: soft oval face, calm dark eyes, low ponytail, mole
+     under left eye.` — the `identifier_label`, then the card's anchors. It is
+     what keeps a face the same across pages.
+   - The **render-tag run** that closes it, one comma-run: subject count as
+     `1girl` / `1boy` / `1other` and what the page relies on, ending
+     `uncensored` (the shape of Type A's tail: `1girl, 1boy, sailor uniform,
+     traditional Japanese inn, uncensored`).
+
+   Name the medium and the palette's hues (not just "cool palette"), the light,
+   and the figures' skin tone. Do not repeat a phrase inside the summary.
+
+   The summary is a **style and composition lock, not a synopsis**: it says what
+   the page looks like, never what happens in it — no story beats, no emotional
+   arc. The captions carry the action.
 
 4. Write each **lettering box** in one line: carrier, direction, language, and
    the treatment the conti chose (`../manga-craft/comic-planning.md` §6.0). The
@@ -89,6 +138,17 @@ coordinates, and you never state them. You decide what is *drawn inside* them.
    One `panels` entry per conti panel (same `n`), one `texts` entry per conti
    text (same `id`). Nothing else changes: the sheet keeps the boxes.
 
+## Length
+
+Calibrated to the reference prompts: a panel caption 80-150 words, the summary
+brief 60-100 words, a lettering caption one sentence. Shorter leaves the model
+guessing; longer buries the one thing the panel is about.
+
+A figure's full description is the longest sentence on the page: A's lead runs
+five sentences covering age, face, eyes with their colour, hair with its colour
+and texture, skin tone, proportions and wardrobe. A two-sentence descriptor is
+what makes the figure drift.
+
 ## Rules that are not negotiable
 
 - **Described, not named.** No character name in a caption unless the name is
@@ -101,8 +161,15 @@ coordinates, and you never state them. You decide what is *drawn inside* them.
 - A caption answers: what, what shape, what light, what expression
   (`comic-planning.md` §7).
 - Do not restate the conti's `beat` verbatim. Rewrite it as what is seen.
+- **No style words in a caption.** `painterly`, `brushwork`, `gouache`,
+  `watercolor`, `lineart`, `photograph`, `cel shading` belong in the summary;
+  a panel caption says what the panel draws (`prompt-formats.md` §2).
 - No lettering caption carries the words. Not a dialogue line, not an SFX
   glyph — the box is described, the text is not repeated.
+- A lettering caption names its language (Korean, English, Japanese) — one of
+  the project's languages, or all of them when the page is lettered in all.
+- The summary carries the lettering-rendering clause and the render tags, and
+  never narrates the story.
 
 ## Done when
 

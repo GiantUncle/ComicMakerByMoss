@@ -45,6 +45,10 @@ def main() -> int:
         print(f"project {args.slug!r} has no episodes")
         return 2
     pages = root / "episodes" / ep / "pages"
+    pool = json.loads((root / "bible" / "characters.json").read_text(encoding="utf-8")) \
+        if (root / "bible" / "characters.json").is_file() else {"characters": [], "objects": []}
+    cards = {c["id"]: c for c in pool.get("characters", [])}
+    cards |= {o["id"]: o for o in pool.get("objects", [])}
 
     rows: list[dict] = []
     issues: list[dict] = []
@@ -57,7 +61,7 @@ def main() -> int:
                                          "no conti for this artwork page"))
             continue
         conti = json.loads(conti_path.read_text(encoding="utf-8"))
-        page_issues = validate.validate_artwork(art, conti)
+        page_issues = validate.validate_artwork(art, conti, cards)
         issues += page_issues
         rows.append({
             "page": page,

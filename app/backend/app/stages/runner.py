@@ -30,7 +30,7 @@ from .registry import Stage
 Caller = Callable[[str, str, str], str]      # (stage_id, system, user) -> reply text
 
 SLUG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-MAX_REPAIR = 3
+MAX_REPAIR = 8
 
 SHEET_FRAMING = (
     "A character reference sheet: one figure, front and three-quarter bust, "
@@ -911,9 +911,9 @@ def _pos_hint(bbox: list[float], width: int, height: int) -> str:
     return f"{row}-{band}, {shape}"
 
 
-def _artwork_check(conti: dict):
+def _artwork_check(conti: dict, characters: dict | None = None):
     def check(data: dict) -> list[dict]:
-        return validate.validate_artwork(data, conti)
+        return validate.validate_artwork(data, conti, characters)
     return check
 
 
@@ -999,11 +999,15 @@ def _run_artwork(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages
             return {"dry": True, "system": system, "user": user,
                     "note": f"artwork prompt for page {n}"}
 
-        data, page_issues = _ask_until_valid(stage, system, user, caller, _artwork_check(conti), feedback)
+        data, page_issues = _ask_until_valid(stage, system, user, caller,
+                                             _artwork_check(conti, cards), feedback)
         errs = validate.errors(page_issues)
         issues += page_issues
         if errs:
             raise StageError(f"page {n} artwork still fails validation: " + _first_error(page_issues))
+        if isinstance(data, dict):
+            # the boxes this page was drawn against; stage 9 compares it
+            data.setdefault("geometry", build.panel_geometry_key(sheet))
         art_path = pages_dir / f"page-{n:03d}.art.json"
         _write_json(art_path, data)
         files.append(_rel(root, art_path))
@@ -1011,12 +1015,25 @@ def _run_artwork(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages
     return {"note": f"artwork for pages {wanted[0]}..{wanted[-1]}", "files": files, "issues": issues}
 
 
-def _apply_artwork(sheet: dict, art: dict) -> dict:
+LANG_NAME = {"ko": "Korean", "en": "English", "ja": "Japanese"}
+
+
+def _apply_artwork(sheet: dict, art: dict, lang: str = "ko") -> dict:
     """Put the artist's captions onto the sheet's boxes. Boxes never move."""
     out = json.loads(json.dumps(sheet))
     summary = out.setdefault("summary", {})
     if str(art.get("summary_caption", "")).strip():
-        summary["caption"] = str(art["summary_caption"]).strip()
+        # the summary's lettering clause is normalised the same way the text
+        # captions are — it must promise exactly the language the page renders
+        cap = str(art["summary_caption"]).strip()
+        cap = re.sub(
+            r"\b(?:Korean|English|Japanese)\b"
+            r"(?:\s*(?:,\s*(?:and\s*)?|/\s*|\band\s+)\b(?:Korean|English|Japanese)\b)*",
+            LANG_NAME.get(lang, "Korean"),
+            cap,
+            flags=re.IGNORECASE,
+        )
+        summary["caption"] = cap
 
     panels = {int(p.get("n", 0)): str(p.get("caption", "")).strip() for p in art.get("panels", [])}
     texts = {str(t.get("id")): str(t.get("caption", "")).strip() for t in art.get("texts", [])}
@@ -1046,6 +1063,18 @@ def _apply_artwork(sheet: dict, art: dict) -> dict:
                 cap = panel_order[drawn_i] if drawn_i < len(panel_order) else None
             drawn_i += 1
         if cap:
+            if item.get("label") == "text":
+                # the caption names the language the lettering renders in; the
+                # artist writes it before the compile language is known, so the
+                # whole language run ("Korean, English and Japanese") collapses
+                # to this sheet's one language here.
+                cap = re.sub(
+                    r"\b(?:Korean|English|Japanese)\b"
+                    r"(?:\s*(?:,\s*(?:and\s*)?|/\s*|\band\s+)\b(?:Korean|English|Japanese)\b)*",
+                    LANG_NAME.get(lang, "Korean"),
+                    cap,
+                    flags=re.IGNORECASE,
+                )
             item["caption"] = cap
     return out
 
@@ -1071,12 +1100,23 @@ def _run_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages
             raise StageError(f"missing cut sheet for page {n} — run stage 7 (컷 시트) first")
         if not art_path.is_file():
             raise StageError(f"missing artwork for page {n} — run stage 8 (만화가) first")
-        if art_path.stat().st_mtime < sheet_path.stat().st_mtime:
+        sheet = _read_json(sheet_path)
+        art = _read_json(art_path)
+        key = art.get("geometry")
+        if key:
+            # the drawing is bound to the panel boxes, not to the lettering boxes
+            if key != build.panel_geometry_key(sheet):
+                raise StageError(
+                    f"page {n} panels moved since it was drawn — "
+                    "draw the page again (stage 8)"
+                )
+        elif art_path.stat().st_mtime < sheet_path.stat().st_mtime:
             raise StageError(
                 f"artwork for page {n} is older than its panel boxes — "
                 "the page was re-boxed, so draw it again (stage 8)"
             )
-        draft = _apply_artwork(_read_json(sheet_path), _read_json(art_path))
+        lang = project.get("languages", {}).get("default", "ko")
+        draft = _apply_artwork(sheet, art, lang)
         draft_issues = validate.validate_draft(draft, project)
         issues += [i for i in draft_issues if i["code"] not in ("page.panel-count",)]
         prompt_text = build.compile_draft(draft)
@@ -1787,7 +1827,11 @@ def review(slug: str, stage_id: str, *, ep: str | None = None, block: int = 1) -
             conti_path = root / "episodes" / ep / "pages" / f"page-{n:03d}.conti.json"
             conti = _read_json(conti_path, {}) if conti_path.is_file() else {}
             if conti:
-                issues += validate.validate_artwork(art, conti)
+                pool = _read_json(root / "bible" / "characters.json", {"characters": [], "objects": []})
+                cards = {c["id"]: c for c in pool.get("characters", [])} | {
+                    o["id"]: o for o in pool.get("objects", [])
+                }
+                issues += validate.validate_artwork(art, conti, cards)
             layout = conti.get("layout") or {}
             pages.append({
                 "page": n,

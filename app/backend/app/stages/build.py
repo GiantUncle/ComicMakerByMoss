@@ -262,37 +262,50 @@ def _orientation(vertical: bool) -> str:
     return "vertical" if vertical else "horizontal"
 
 
-def text_caption(kind: str, bubble: str, vertical: bool, tail: str | None) -> str:
+LANG_NAME = {"ko": "Korean", "en": "English", "ja": "Japanese"}
+
+
+def _lang_word(lang: str | None) -> str:
+    """The lettering language, named per item — `prompt-formats.md` §2 / §7.
+
+    `None` leaves it out (the manga build passes none, so its output is unchanged).
+    """
+    return (LANG_NAME.get(lang or "", "") + " ") if lang else ""
+
+
+def text_caption(kind: str, bubble: str, vertical: bool, tail: str | None,
+                 lang: str | None = None) -> str:
     """The treatment, written as a caption the compiler and preview both read.
 
     The shape follows the role (`comic-planning.md` §6.0): speech carries a tail to
     the speaker's mouth, narration is a rectangle with no tail, SFX is lettering on
-    the art.
+    the art. `lang` names the lettering language so a recompile swaps it.
     """
     o = _orientation(vertical)
+    w = _lang_word(lang)
     tail_phrase = f", the tail pointing toward {tail}" if tail else ""
     if kind == "sfx":
-        return (f"Bold {o} comic sound effect lettering drawn on the art at the "
+        return (f"Bold {w}{o} comic sound effect lettering drawn on the art at the "
                 "source of the sound, with a white halo around the letters.")
     if kind == "narration":
         if bubble == "solid":
-            return f"Clean {o} narration text in a solid black rectangular box with white lettering, no balloon tail."
-        return f"Clean {o} narration text in a plain white rectangular box, no balloon tail."
+            return f"Clean {w}{o} narration text in a solid black rectangular box with white lettering, no balloon tail."
+        return f"Clean {w}{o} narration text in a plain white rectangular box, no balloon tail."
     if kind == "thought":
-        return f"Clean {o} thought text in a cloud-shaped balloon with a dotted outline and no solid tail."
+        return f"Clean {w}{o} thought text in a cloud-shaped balloon with a dotted outline and no solid tail."
     if kind == "sign":
-        return f"Clean {o} signage text painted on the surface of the object."
+        return f"Clean {w}{o} signage text painted on the surface of the object."
     if kind == "title":
-        return f"Clean {o} title lettering set over the art."
+        return f"Clean {w}{o} title lettering set over the art."
     if bubble == "round":
-        return f"Clean {o} dialogue text in a rounded speech balloon{tail_phrase}."
+        return f"Clean {w}{o} dialogue text in a rounded speech balloon{tail_phrase}."
     if bubble == "oval":
-        return f"Clean {o} dialogue text in an oval speech balloon{tail_phrase}."
+        return f"Clean {w}{o} dialogue text in an oval speech balloon{tail_phrase}."
     if bubble == "jagged":
-        return f"Clean {o} shouted dialogue text in a jagged balloon{tail_phrase}."
+        return f"Clean {w}{o} shouted dialogue text in a jagged balloon{tail_phrase}."
     if bubble == "rect":
-        return f"Clean {o} dialogue text in a flat rectangular balloon{tail_phrase}."
-    return f"Loose {o} floating lettering on the art, no balloon outline."
+        return f"Clean {w}{o} dialogue text in a flat rectangular balloon{tail_phrase}."
+    return f"Loose {w}{o} floating lettering on the art, no balloon outline."
 
 
 def join_lines(entry: dict, lang: str) -> str:
@@ -311,10 +324,12 @@ def cast_index_prose(ids: list[str], characters: dict[str, dict]) -> str:
         if not card:
             continue
         label = card.get("identifier_label") or "the figure"
-        anchors = ", ".join(card.get("anchors", []))
-        sig = card.get("signature")
-        tail = f", {sig}" if sig else ""
-        out.append(f"{label}: {anchors}{tail}.")
+        terms = [str(a).strip() for a in card.get("anchors", []) if str(a).strip()]
+        sig = str(card.get("signature") or "").strip()
+        # the signature is often already one of the anchors — do not emit it twice
+        if sig and sig.lower() not in ", ".join(terms).lower():
+            terms.append(sig)
+        out.append(f"{label}: {', '.join(terms)}.")
     return "\n".join(out)
 
 
@@ -444,26 +459,65 @@ def build_page(
     return draft
 
 
+def panel_geometry_key(sheet: dict) -> str:
+    """A stable key for a sheet's drawn boxes.
+
+    The artist's captions are written against the panel boxes, not against the
+    lettering boxes: re-sizing a text box does not invalidate the drawing, while
+    moving a panel does. Stage 9 compares this key instead of file times.
+    """
+    import hashlib
+
+    parts = [f"{sheet.get('width')}x{sheet.get('height')}"]
+    for it in sheet.get("items", []):
+        if it.get("label") == "text":
+            continue
+        box = it.get("bbox")
+        if isinstance(box, list) and len(box) == 4:
+            parts.append(",".join(str(round(float(v))) for v in box))
+    return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def _font_floor(height: int) -> float:
+    """The smallest letter size that still reads at this canvas height."""
+    return max(9.0, 11.0 * height / 1536)
+
+
 def _text_bbox(entry, assigned, width, height, body, vertical, cl):
-    """The conti's box if it is sane; otherwise a box inside its panel's content area."""
+    """A box the lettering can actually be read in.
+
+    The conti's box is taken only when the text already fits it at a readable
+    size. A box too small for its own words is not a box — it would render the
+    line at 9 px, so the words are re-boxed at a comfortable size instead. The
+    new box starts inside its panel and grows out to the canvas when the panel
+    cannot hold it (narration may sit over the art; a box may not leave the
+    page).
+    """
+    floor = _font_floor(height)
+    edge = max(28.0, height * 0.02)   # the compiler wants lettering off the edge
     raw = entry.get("bbox")
     if isinstance(raw, list) and len(raw) == 4:
         x1, y1, x2, y2 = raw
-        if 0 <= x1 < x2 <= width and 0 <= y1 < y2 <= height:
+        inside = (edge <= x1 < x2 <= width - edge) and (edge <= y1 < y2 <= height - edge)
+        if inside and cl.implied_font_size(x2 - x1, y2 - y1, body, vertical) >= floor:
             return [x1, y1, x2, y2]
 
-    # keep the lettering inside the panel's inner area (the dataset's content_bbox)
     lp = assigned.get(entry.get("panel_ref")) or (next(iter(assigned.values())) if assigned else None)
     base = (lp or {}).get("content_bbox") or (lp or {}).get("bbox") or [0, 0, width, height]
 
-    font = max(11.0, height / 70)
+    font = max(height / 70.0, floor * 1.25)
     need_w, need_h = cl.required_box(body, vertical, font)
     pad = font * 0.6
+    # the compiler wants lettering off the canvas edge by a margin
+    margin = max(28.0, pad)
+    w = min(need_w + pad * 2, width - margin * 2)
+    h = min(need_h + pad * 2, height - margin * 2)
     bx1, by1, bx2, by2 = base
-    w = min(need_w + pad * 2, (bx2 - bx1) - pad)
-    h = min(need_h + pad * 2, (by2 - by1) - pad)
-    x1 = bx1 + (bx2 - bx1 - w) / 2
+    x1 = bx1 + ((bx2 - bx1) - w) / 2
     y1 = by1 + pad
+    # keep the whole box on the canvas; a panel too small lets it grow outward
+    x1 = max(margin, min(x1, width - w - margin))
+    y1 = max(margin, min(y1, height - h - margin))
     return [round(x1), round(y1), round(x1 + w), round(y1 + h)]
 
 
@@ -480,7 +534,9 @@ def compile_draft(draft: dict[str, Any]) -> str:
     result = cl.compile_layout(normalized)
     payload = json.dumps(result, ensure_ascii=False, indent=2)
     if normalized.get("prefix"):
-        payload = normalized["prefix"] + "\n" + payload
+        # the reference form is the trigger, then a LITERAL \n (two characters),
+        # then the JSON — see verified-examples.md, "Trigger"
+        payload = normalized["prefix"] + "\\n" + payload
     return payload
 
 
@@ -553,29 +609,42 @@ def compile_single_frame(
     style = str(scene.get("style", "")).strip()
     texts = scene.get("texts", []) or []
 
+    # Who is drawn on this frame, lead first. `characters` is the frame's cast;
+    # `anchor_of` names the lead. Falls back to the speakers when neither is
+    # given. R-A: EVERY character on the page gets their FULL description once,
+    # and R-D: every one of them enters the cast index.
     present: list[str] = []
-    for t in texts:
-        sp = t.get("speaker")
-        if sp and sp not in present:
-            present.append(sp)
+    for cid in (scene.get("characters") or []):
+        if cid and cid not in present:
+            present.append(cid)
     anchor = scene.get("anchor_of")
-    if not anchor and len(present) == 1:
-        anchor = present[0]
     if anchor and anchor not in present:
         present.insert(0, anchor)
+    if not present:
+        for t in texts:
+            sp = t.get("speaker")
+            if sp and sp not in present:
+                present.append(sp)
+    if anchor in present:
+        present.remove(anchor)
+        present.insert(0, anchor)
+    present = [c for c in present if c in characters] or present
+
     index_prose = cast_index_prose(present, characters)
     caption = style if not index_prose else f"{style}\n{index_prose}"
 
-    frame_cap = str(scene.get("scene", "")).strip()
-    card = characters.get(anchor) if anchor else None
-    if card and card.get("descriptor"):
-        # R-A: on each page a figure's FULL description appears exactly once. A
-        # comic page is one frame, so that frame always carries it — the figure
-        # is described, never labelled.
-        frame_cap = f"{frame_cap} {card['descriptor']}".strip()
-    # the anchored subject is a person, so give the model a `character` — the
-    # scene may carry its own label, but an anchor always means a figure
-    label = "character" if anchor else (scene.get("label") or "object")
+    scene_text = str(scene.get("scene", "")).strip()
+    # each present figure's canonical descriptor, lead first; §9 keeps its
+    # `Apparent age group:` head at the head, and the scene/action follows.
+    descs = [
+        str(characters[c]["descriptor"]).strip()
+        for c in present
+        if characters.get(c, {}).get("descriptor")
+    ]
+    head = " ".join(descs)
+    frame_cap = f"{head} {scene_text}".strip() if head else scene_text
+    # any figure on the page makes it a `character` frame
+    label = "character" if present else (scene.get("label") or "object")
 
     frame_item: dict[str, Any] = {
         "label": label,
@@ -594,10 +663,14 @@ def compile_single_frame(
         bbox = t.get("bbox")
         if not (isinstance(bbox, list) and len(bbox) == 4):
             bbox = _default_text_box(body, vertical, width, height, len(items))
+        # R-C: a tail points at the character's identifier label, never the raw
+        # card id — a slug is not a description.
+        tail_id = t.get("tail")
+        tail_label = (characters.get(tail_id) or {}).get("identifier_label") or tail_id
         items.append({
             "label": "text",
             "caption": text_caption(
-                t.get("kind", "dialogue"), t.get("bubble", "round"), vertical, t.get("tail"),
+                t.get("kind", "dialogue"), t.get("bubble", "round"), vertical, tail_label, lang,
             ),
             "text": body,
             "bbox": [round(v) for v in bbox],

@@ -136,8 +136,15 @@ def _check_items(
         label = item.get("label")
         if label not in LABELS:
             out.append(issue("error", "item.bad-label", where, f"label {label!r} is not one of {LABELS}"))
-        if not str(item.get("caption", "")).strip():
+        cap_text = str(item.get("caption", ""))
+        if not cap_text.strip():
             out.append(issue("error", "item.no-caption", where, "caption is empty"))
+        # style belongs to the summary; a caption says what this box draws
+        leaked = [w for w in STYLE_WORDS if w in cap_text.lower()]
+        if leaked:
+            out.append(issue("warning", "item.style-in-caption", where,
+                             f"caption carries style words {leaked} — style lives in the summary "
+                             "(prompt-formats.md §2)"))
 
         box_err = _check_bbox(item.get("bbox"), width, height)
         if box_err:
@@ -317,6 +324,13 @@ def validate_conti(conti: dict, project: dict) -> list[dict]:
         if count != 1:
             out.append(issue("error", "conti.anchor-count", where,
                              f"{cid} has {count} anchor panels (need exactly one)"))
+    # the anchor panel is where the figure is fully drawn: a part-only frame
+    # (extreme close-up, insert) cannot hold a whole person
+    for i, panel in enumerate(panels):
+        if panel.get("anchor_of") and str(panel.get("shot", "")) in ("extreme_close", "insert"):
+            out.append(issue("error", "conti.anchor-on-part-shot", f"{where}/panels[{i}]",
+                             f"{panel['anchor_of']} is anchored on a {panel['shot']} frame — "
+                             "anchor a character where the whole figure is in frame"))
 
     texts = conti.get("texts", [])
     seen_ids = set()
@@ -395,7 +409,17 @@ POSITION_PREFIX = re.compile(
 COORDINATE_IN_CAPTION = re.compile(r"\[\s*-?\d")
 
 
-def validate_artwork(art: dict, conti: dict) -> list[dict]:
+PART_ONLY = re.compile(
+    r"extreme close-up|isolates the|inset panel|only the (?:hand|hands|eyes|mouth|face|fingers)",
+    re.IGNORECASE,
+)
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"\s+", " ", text or "").strip().lower()
+
+
+def validate_artwork(art: dict, conti: dict, characters: dict | None = None) -> list[dict]:
     out: list[dict] = []
     page = conti.get("page", "?")
     where = f"page {page}"
@@ -403,9 +427,18 @@ def validate_artwork(art: dict, conti: dict) -> list[dict]:
     if int(art.get("page", 0) or 0) != int(page or 0):
         out.append(issue("error", "art.missing-page", where,
                          f"artwork says page {art.get('page')!r} — it must be page {page}"))
-    if not str(art.get("summary_caption", "")).strip():
+    summary = str(art.get("summary_caption", "")).strip()
+    if not summary:
         out.append(issue("error", "art.no-summary", where,
                          "summary_caption is empty — the page needs its art direction"))
+    elif not re.search(r"balloon|lettering|speech|dialogue text", summary, re.IGNORECASE):
+        out.append(issue("error", "art.summary-no-lettering-clause", where,
+                         "the summary does not say how the lettering is rendered "
+                         "(Type A: 'crisp ... dialogue text in clean speech bubbles')"))
+    if summary and not re.search(r"\b(?:skin|complexion|flesh)\b", summary, re.IGNORECASE):
+        out.append(issue("warning", "art.summary-no-skin", where,
+                         "the summary does not state the figures' skin tone "
+                         "(Type A: 'warm peach skin', 'smooth creamy skin tones')"))
 
     want_panels = {int(p.get("n", 0)) for p in conti.get("panels", [])}
     beat_of = {int(p.get("n", 0)): str(p.get("beat", "")).strip() for p in conti.get("panels", [])}
@@ -430,8 +463,64 @@ def validate_artwork(art: dict, conti: dict) -> list[dict]:
         if beat_of.get(n) and caption == beat_of[n]:
             out.append(issue("warning", "art.conti-copied", pw,
                              "caption is the conti's beat verbatim — the artist rewrites the page"))
+        leaked = [w for w in STYLE_WORDS if w in caption.lower()]
+        if leaked:
+            out.append(issue("error", "art.style-in-caption", pw,
+                             f"caption names the medium or technique {leaked} — style belongs to the "
+                             "summary; a caption says what this panel draws"))
+        neg = re.findall(r"\bno\s+(?:hair|skin tone|headwear|accessories|makeup|shoes)\b",
+                         caption, re.IGNORECASE)
+        if neg:
+            out.append(issue("error", "art.negative-phrasing", pw,
+                             f"caption says what is missing {neg} — write what is there "
+                             "(authoring-spec.md §11.4)"))
     for n in sorted(want_panels - seen_panels):
         out.append(issue("error", "art.panel-missing", where, f"no caption for panel {n}"))
+
+    # R-A: one full descriptor per character, on the panel that anchors them,
+    # and the signature attribute stated once on the page.
+    if characters:
+        anchors: dict[str, int] = {}
+        for p in conti.get("panels", []):
+            cid = p.get("anchor_of")
+            if cid:
+                anchors[str(cid)] = int(p.get("n", 0))
+        by_n = {int(p.get("n", 0)): str(p.get("caption", "")) for p in art.get("panels", [])}
+        for cid, n in anchors.items():
+            card = characters.get(cid) or {}
+            desc = _norm(card.get("descriptor", ""))
+            cap = _norm(by_n.get(n, ""))
+            if desc and desc not in cap:
+                out.append(issue("error", "art.anchor-not-verbatim", f"{where}/panels[{n}]",
+                                 f"the panel anchoring {cid} must carry its cast descriptor word for "
+                                 "word (character-consistency.md R-A)"))
+            if PART_ONLY.search(cap):
+                out.append(issue("error", "art.anchor-on-part-frame", f"{where}/panels[{n}]",
+                                 f"panel {n} is a part-only frame but it anchors {cid} — a part frame "
+                                 "is an object that shows only its part, and the full descriptor "
+                                 "belongs on the frame where the figure is the subject"))
+            sig = _norm(card.get("signature", ""))
+            if sig:
+                n_hits = sum(1 for cap2 in by_n.values() if sig in _norm(cap2))
+                if n_hits > 1:
+                    out.append(issue("error", "art.signature-repeated", where,
+                                     f"the signature {sig!r} is stated {n_hits} times — an attribute "
+                                     "is stated once on the page"))
+
+        # a re-appearance gets the label and AT MOST one anchor, never the set
+        anchors_of = {str(cid): [a for a in (characters.get(str(cid)) or {}).get("anchors", [])]
+                      for cid in anchors}
+        for p in art.get("panels", []):
+            n = int(p.get("n", 0))
+            if n in anchors.values():
+                continue          # the anchor frame carries the descriptor
+            cap = _norm(p.get("caption", ""))
+            for cid, terms in anchors_of.items():
+                hits = [t for t in terms if t and _norm(t) in cap]
+                if len(hits) > 1:
+                    out.append(issue("error", "art.reappearance-too-detailed", f"{where}/panels[{n}]",
+                                     f"panel {n} re-describes {cid} with {len(hits)} anchors {hits} — "
+                                     "a re-appearance carries the label and at most one anchor"))
 
     want_texts = {str(t.get("id")) for t in conti.get("texts", [])}
     lines_of: dict[str, list[str]] = {}
@@ -456,6 +545,14 @@ def validate_artwork(art: dict, conti: dict) -> list[dict]:
         if any(line and line in caption for line in lines_of.get(tid, [])):
             out.append(issue("warning", "art.text-restates-words", tw,
                              "caption restates the lettering — describe the box, the words stay in the conti"))
+        if not re.search(r"korean|english|japanese", caption, re.IGNORECASE):
+            out.append(issue("warning", "art.text-language-missing", tw,
+                             "caption does not name its language (Korean / English / Japanese)"))
+        leaked = [w for w in STYLE_WORDS if w in caption.lower()]
+        if leaked:
+            out.append(issue("error", "art.style-in-caption", tw,
+                             f"caption names the medium or technique {leaked} — style belongs to the "
+                             "summary"))
         if want_texts and tid not in want_texts:
             out.append(issue("warning", "art.extra-text", tw,
                              f"text {tid!r} is not in the conti"))
@@ -682,6 +779,12 @@ def validate_bible(pool: dict, cast: list[str] | None = None) -> list[dict]:
                 ids.add(cid)
             if not str(card.get("descriptor", "")).strip():
                 out.append(issue("error", "bible.no-descriptor", cw, "descriptor is empty"))
+            elif bucket == "characters" and not re.match(
+                r"\s*apparent age group\s*:", card["descriptor"], re.IGNORECASE
+            ):
+                out.append(issue("error", "bible.descriptor-shape", cw,
+                                 "descriptor must open with 'Apparent age group: <one of the "
+                                 "seven>' — the shape is fixed by character-consistency.md §9"))
             else:
                 low = card["descriptor"].lower()
                 hit = [w for w in STYLE_WORDS if w in low]
@@ -690,9 +793,13 @@ def validate_bible(pool: dict, cast: list[str] | None = None) -> list[dict]:
                                      f"descriptor carries style words {hit} — appearance only"))
             if bucket == "characters":
                 name = card.get("name") or {}
-                missing = [l for l in ("ko", "en", "ja") if not str(name.get(l, "")).strip()]
-                if missing:
-                    out.append(issue("warning", "bible.name-langs", cw, f"name missing {missing}"))
+                filled = [l for l in ("ko", "en", "ja") if str(name.get(l, "")).strip()]
+                # a character with no name in the story leaves `name` empty and the
+                # workflow proceeds — identity is the descriptor, not a name. Only a
+                # half-filled name (some languages, not all) is a problem.
+                if filled and len(filled) < 3:
+                    out.append(issue("warning", "bible.name-langs", cw,
+                                     f"name is in only {filled} — give all three languages or leave it empty"))
                 anchors = card.get("anchors") or []
                 if not (2 <= len(anchors) <= 4):
                     out.append(issue("error", "bible.anchors", cw, f"{len(anchors)} anchors (need 2-4)"))
@@ -700,6 +807,12 @@ def validate_bible(pool: dict, cast: list[str] | None = None) -> list[dict]:
                     out.append(issue("error", "bible.no-signature", cw, "need exactly one signature detail"))
                 if not str(card.get("identifier_label", "")).strip():
                     out.append(issue("error", "bible.no-identifier", cw, "identifier_label is empty"))
+                neg = re.findall(r"\bno\s+(?:hair|skin tone|headwear|accessories|makeup|shoes)\b",
+                                 str(card.get("descriptor", "")), re.IGNORECASE)
+                if neg:
+                    out.append(issue("warning", "bible.negative-phrasing", cw,
+                                     f"descriptor says what is missing {neg} — write what is there "
+                                     "(authoring-spec.md §11.4)"))
     if cast is not None:
         unknown = [c for c in cast if c not in ids]
         if unknown:

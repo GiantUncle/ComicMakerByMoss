@@ -19,8 +19,8 @@ scene). It does not replace `comic-planning.md` (panel grammar) or
 - The pages are consecutive **moments in one place**: a cafe table, a doorway, a
   corridor. The place is set once and mostly holds.
 - Each frame differs only a little from the one before — a hand moves, the
-  expression changes, the zipper slips. The reader feels time pass by flipping
-  frames, not by a cut to a new scene.
+  expression changes, one small thing alters. The reader feels time pass by
+  flipping frames, not by a cut to a new scene.
 - **No big composition change between pages.** Do not jump wide → extreme
   close → new angle for effect; keep the camera roughly still and let the small
   change carry the beat.

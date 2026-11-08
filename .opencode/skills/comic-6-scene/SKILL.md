@@ -30,7 +30,7 @@ Return exactly one object and nothing else:
       "scene": "<the whole frame drawn in words>",
       "frame_bbox": [x1, y1, x2, y2],
       "style": "<one line: medium, palette, light, mood, subject count>",
-      "anchor_of": "<character id whose descriptor this frame anchors>",
+      "characters": ["<every character id drawn on this page, lead first>"],
       "label": "character",
       "texts": [
         {
@@ -69,25 +69,45 @@ could ink:
 
 **Density, calibrated to the reference prompts (`docs/reference-prompts/`):** a
 `scene` runs **80–150 words**. Shorter leaves the model guessing; longer buries
-the one thing the frame is about. The `style` line is one clause-run of medium,
-palette, light, mood and the subject count (`1girl, 1boy`, …), the way Type A/C
-open.
+the one thing the frame is about.
+
+**The `style` line** is the page's art direction — a comma-run the way Type A/C
+open, and it carries, in order: **medium** (a 2D digital painting comic), the
+**rendering quality** (what is drawn finely — *finely rendered luminous facial
+features, glistening highlights, delicate hair strands against breathable
+painterly brushwork*), the **palette by hue** (not just "warm palette" — *muted
+cream, rose-beige and amber*), the **light** (source, direction, softness), the
+page's **mood**, the **lettering rendering** (*crisp dialogue text in clean
+speech bubbles* — **do not name the language**; the compiler names the lettering
+language from whichever of ko/en/ja the prompt is compiled for), and the
+**count tags** (`1girl, 1boy`, …). Include
+`selective focus` for painterly pages (`authoring-spec.md` §12 — centre rendered
+fine, edges loose).
+
+- **Never write the adapter or trigger name** (`FKEY`, `fkey`) — the compiler
+  adds the `<|artist|>fkey` line itself. Naming it here duplicates it.
+- **No annotating a count tag.** Write `1girl, 1boy`; never
+  `1boy (hand only)`. The scene says who is on the page.
+- No story beats in the style line — it is a look, not a synopsis.
 
 ## 3. Identity — described, never labelled
 
 **This is the rule that keeps a character the same person across pages.**
 
-- The frame's `anchor_of` names the character whose identity this frame fixes.
-  **The build appends that character's full `descriptor` to the frame
-  automatically** — so do **not** repeat their face, hair or clothing in `scene`.
-  Spend `scene` on framing, placement, background, light, action and expression.
-  (R-A: a figure's FULL description appears exactly once per page, and a comic
-  page is one frame, so that frame always carries it.)
-- A character who appears but is **not** the frame's `anchor_of` gets **no**
-  automatic descriptor — so **you** must name their identity in `scene` with
-  their card's `anchors` (e.g. `the tall man's forearm, a charcoal knit cuff`).
-- **Never use an identifier label or a `ref_id` to stand in for a person.** A
-  caption that carries only a label is not drawn. A person is described.
+- `characters` lists **every** character the frame draws, lead first. List a
+  character only if they are actually in the frame — a voice off-frame is not a
+  character on the page.
+- **The build appends the full `descriptor` of every character in `characters`
+  to the frame automatically.** So do **not** repeat any of their faces, hair or
+  clothing in `scene` — spend `scene` on framing, placement, background, light,
+  action and expression. (R-A: each character's FULL description appears exactly
+  once per page, and a comic page is one frame, so that frame carries it.)
+- Because every drawn figure is auto-described, `scene` should name a figure
+  only by their `identifier_label` when it must point at them
+  (`his angular face turns away` — not a second description of the face).
+- **Never write an id, an `identifier_label` alone, or a `ref_id` as if it were
+  the drawing.** A caption that carries only a label is not drawn; the drawing
+  and the identity come from the descriptor.
 - A name (`name[lang]`) enters the image only where the name itself is drawn — a
   name tag, a sign, a title. Elsewhere, describe.
 
@@ -109,6 +129,11 @@ One `texts` entry per spoken line, narration or SFX.
 ## 5. Rules that are not negotiable
 
 - One frame a page; no panels, no layout, no template.
+- `frame_bbox` keeps about a **5% margin** from the canvas edge
+  (`prompt-formats.md` §2) — on a 992×1408 page, roughly x 48..944, y 70..1338,
+  rounded to multiples of 16. Do not run the box edge-to-edge.
+- `characters` lists every figure the frame draws, lead first — no one left off,
+  no one added who is not on the page.
 - Camera stays roughly still across the block: a small change frame to frame,
   not a new scene (`twitter-comic.md` §2).
 - Described, not named; no coordinates in `scene`; no instructions to the model
