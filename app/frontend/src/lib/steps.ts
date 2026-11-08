@@ -7,7 +7,7 @@
  * 4 레퍼런스 시트 (project)
  * 5 페이지 계획 (episode)
  * 6 콘티 (episode)      — AI 설계 + 만화가가 페이지를 그림 + 코드가 프롬프트로 내보냄
- * 7 프롬프트 (episode)  — 원고 미리보기/워크벤치 (+ MOSS-Image 프롬프트)
+ * 7 프롬프트 (episode)  — 원고 미리보기/페이지 손보기 (+ MOSS-Image 프롬프트)
  *
  * Internal creation state may still use step 1 in the wizard when no project exists.
  */
@@ -80,7 +80,7 @@ export const MANGA_STEPS: StepMeta[] = [
     label: "프롬프트",
     scope: "episode",
     blurb:
-      "만화가가 그린 페이지를 MOSS-Image가 바로 읽는 프롬프트(prompt.txt · negative.txt)로 내보내는 단계입니다. 언어를 바꾸면 여기서 다시 내보내며, 번역하지 않습니다. 원고 미리보기와 워크벤치도 이 단계 안에서 봅니다.",
+      "만화가가 그린 페이지를 MOSS-Image가 바로 읽는 프롬프트(prompt.txt · negative.txt)로 내보내는 단계입니다. 언어를 바꾸면 여기서 다시 내보내며, 번역하지 않습니다. 원고 미리보기와 페이지 손보기도 이 단계 안에서 합니다.",
     stages: ["manga-9-prompts"],
   },
 ];

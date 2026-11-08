@@ -297,7 +297,7 @@ export default function Wizard({
               [
                 ["make", "프롬프트"],
                 ["preview", "원고 미리보기"],
-                ["bench", "워크벤치"],
+                ["bench", "페이지 손보기"],
               ] as const
             ).map(([id, label]) => (
               <button

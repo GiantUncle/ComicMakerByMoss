@@ -68,7 +68,7 @@ export default function Illustration({ onProviders }: { onProviders?: () => void
     try {
       const fav = await api.saveFavorite({
         kind: "illustration",
-        title: draft.title || brief.slice(0, 40) || "illustration",
+        title: draft.title || brief.slice(0, 40) || "한 장 프롬프트",
         draft: result.draft,
         prompt: result.prompt,
         negative: result.negative,
@@ -127,10 +127,11 @@ export default function Illustration({ onProviders }: { onProviders?: () => void
   return (
     <div className="wrap">
       <div className="stack-tight">
-        <h1 style={{ margin: 0, fontSize: "var(--text-2xl)" }}>Illustration</h1>
+        <h1 style={{ margin: 0, fontSize: "var(--text-2xl)" }}>한 장 프롬프트</h1>
         <p className="step-blurb">
-          프로젝트 없이 프롬프트 한 장을 즉석에서 만듭니다. 명령을 넣으면 Type B 섹션
-          프롬프트가 나오고, <strong>★ 즐겨찾기</strong>로 담거나 다음 것을 만들면 버려집니다.
+          프로젝트 없이 그림 한 장 분량의 프롬프트를 즉석에서 만듭니다. 명령을 넣으면 섹션으로
+          나뉜 프롬프트가 나오고, <strong>★ 즐겨찾기</strong>로 담지 않으면 다음 것을 만들 때
+          사라집니다.
         </p>
       </div>
 

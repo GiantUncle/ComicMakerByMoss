@@ -106,7 +106,7 @@ export default function Workbench({
     <div className="stack" style={{ gap: "var(--s-4)", padding: "var(--s-4)" }}>
       <div className="pagebar">
         <div className="pagebar-title">
-          워크벤치
+          페이지 손보기
           <span className="res" title={`캔버스 ${tier} — ${tierNote(tier)}`}>
             <span className="res-px">{pxLabel(tier)}</span>
           </span>

@@ -175,7 +175,7 @@ export default function App() {
                 onClick={() => { setSwitcherOpen(false); setStep(-2); }}
               >
                 <span className="ws-tab-kind">도구</span>
-                <span className="ws-tab-name">Illustration</span>
+                <span className="ws-tab-name">한 장 프롬프트</span>
               </button>
             </div>
 
