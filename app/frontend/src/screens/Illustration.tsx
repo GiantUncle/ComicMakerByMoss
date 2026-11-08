@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Favorite, type IllustrationResult } from "../api";
 import { Note } from "../components/ui";
-import { TIERS, pxLabel } from "../lib/canvas";
+import TierPicker from "../components/TierPicker";
 
 /**
  * Illustration — a project-free prompt maker (Type B).
@@ -149,14 +149,7 @@ export default function Illustration({ onProviders }: { onProviders?: () => void
         <div className="row" style={{ gap: "var(--s-4)", flexWrap: "wrap" }}>
           <div className="field" style={{ margin: 0 }}>
             <label>캔버스</label>
-            <div className="tierpick" style={{ flexWrap: "wrap" }}>
-              {TIERS.map((t) => (
-                <button key={t.id} type="button" className="btn toggle" aria-pressed={tier === t.id}
-                  title={`${t.id} — ${pxLabel(t.id)}`} onClick={() => setTier(t.id)}>
-                  {t.id} · {t.w}×{t.h}
-                </button>
-              ))}
-            </div>
+            <TierPicker value={tier} onChange={setTier} label="캔버스" />
           </div>
           <div className="field" style={{ margin: 0 }}>
             <label htmlFor="ill-style">화풍</label>

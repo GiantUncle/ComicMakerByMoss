@@ -932,17 +932,101 @@ def _strip_style_words(text: str) -> str:
     return out.strip()
 
 
-def _sanitize_artwork(data: dict) -> dict:
+def _sentences(text: str) -> list[str]:
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [p for p in parts if p.strip()]
+
+
+def _sanitize_artwork(data: dict, conti: dict, characters: dict | None = None) -> dict:
+    """Mechanical fixes the model keeps missing, applied before validation.
+
+    - style words are removed from captions (they belong to the summary)
+    - the anchor panel carries the cast descriptor word for word: the card's
+      text is placed first and the model's own sentences that merely restate
+      it are dropped, so the drawing keeps its pose and framing and gains the
+      canonical face
+    """
     if not isinstance(data, dict):
         return data
     if isinstance(data.get("summary_caption"), str):
-        data["summary_caption"] = re.sub(r"\s{2,}", " ", data["summary_caption"]).strip()
+        cap = re.sub(r"\s{2,}", " ", data["summary_caption"]).strip()
+        # the summary states the figures' skin tone (Type A) — take it from the
+        # card when the drawing's own brief left it out
+        if cap and not re.search(r"\b(?:skin|complexion|flesh)\b", cap, re.I):
+            for card in (characters or {}).values():
+                m = re.search(r"\b([a-z]+)\s+skin\b", card.get("descriptor", ""), re.I)
+                if m:
+                    # after the style sentence, so it stays inside the brief and
+                    # out of the render-tag run that closes the summary
+                    parts = _sentences(cap)
+                    if parts:
+                        parts.insert(1, f"Their skin is {m.group(1).lower()}.")
+                        cap = " ".join(parts)
+                    else:
+                        cap = f"{cap} Their skin is {m.group(1).lower()}."
+                    break
+        data["summary_caption"] = cap
+
+    anchor_of = {int(p.get("n", 0)): str(p.get("anchor_of"))
+                 for p in conti.get("panels", []) if p.get("anchor_of")}
+    cards = characters or {}
+
     for p in data.get("panels", []) or []:
-        if isinstance(p, dict) and isinstance(p.get("caption"), str):
-            p["caption"] = _strip_style_words(p["caption"])
+        if not isinstance(p, dict) or not isinstance(p.get("caption"), str):
+            continue
+        cap = _strip_style_words(p["caption"])
+        cid = anchor_of.get(int(p.get("n", 0)))
+        if not cid:
+            # a non-anchor frame never re-describes: drop the sentences that
+            # merely restate a card (it keeps the label and one anchor)
+            for card in (characters or {}).values():
+                d_tokens = set(re.findall(r"[a-z]+", card.get("descriptor", "").lower()))
+                if len(d_tokens) < 6:
+                    continue
+                keep = [s for s in _sentences(cap)
+                        if len(set(re.findall(r"[a-z]+", s.lower())) & d_tokens)
+                        / max(1, len(set(re.findall(r"[a-z]+", s.lower())))) < 0.6]
+                cap = " ".join(keep).strip() or cap
+        card = (cards.get(cid) or {}) if cid else {}
+        desc = card.get("descriptor", "")
+        if desc:
+            desc_tokens = set(re.findall(r"[a-z]+", desc.lower()))
+            keep = []
+            for s in _sentences(cap):
+                toks = set(re.findall(r"[a-z]+", s.lower()))
+                overlap = len(toks & desc_tokens) / max(1, len(toks))
+                if overlap < 0.6:
+                    keep.append(s.strip())
+            head = desc.strip()
+            # the anti-drift device Type A writes into the drawing
+            if card.get("age_phrase") and not re.search(r"neither\b.{0,120}?\bnor\b", cap, re.I):
+                low = desc.lower()
+                noun = "woman" if "woman" in low else "man" if " man" in low else "figure"
+                head += f" Neither a big-headed child nor a mature older {noun}."
+            cap = (head + " " + " ".join(keep)).strip()
+        p["caption"] = re.sub(r"\s{2,}", " ", cap).strip()
+
+    lines: list[str] = []
+    for t in conti.get("texts", []):
+        body = t.get("lines") or {}
+        for lang in ("ko", "en", "ja"):
+            for v in (body.get(lang) or []):
+                if str(v).strip():
+                    lines.append(str(v).strip())
     for t in data.get("texts", []) or []:
         if isinstance(t, dict) and isinstance(t.get("caption"), str):
-            t["caption"] = _strip_style_words(t["caption"])
+            cap = _strip_style_words(t["caption"])
+            cap = re.sub(r"\bmultilingual\b\s*", "", cap, flags=re.IGNORECASE)
+            for line in lines:               # the caption describes the box; the
+                if len(line) < 4:            # words stay in the conti (short glyphs
+                    for quoted in (f'"{line}"', f"'{line}'", f"“{line}”"):
+                        cap = cap.replace(quoted, " ")
+                    continue
+                cap = cap.replace(line, " ")
+            # a stripped word must not leave a dangling clause behind
+            cap = re.sub(r"\s*\b(?:of|at|from|near|beside|on|to)\s+the\s*,", ",", cap)
+            cap = re.sub(r"\s*\b(?:of|at|from|near|beside)\s*,", ",", cap)
+            t["caption"] = re.sub(r"\s{2,}", " ", re.sub(r"\s+([.,;:])", r"\1", cap)).strip()
     return data
 
 
@@ -1036,9 +1120,9 @@ def _run_artwork(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages
 
         data, page_issues = _ask_until_valid(stage, system, user, caller,
                                              _artwork_check(conti, cards), feedback)
-        if not validate.errors(page_issues):
-            data = _sanitize_artwork(data)
-            page_issues = validate.validate_artwork(data, conti, cards)
+        # the mechanical fixes run whether or not the model's reply was clean
+        data = _sanitize_artwork(data, conti, cards)
+        page_issues = validate.validate_artwork(data, conti, cards)
         errs = validate.errors(page_issues)
         issues += page_issues
         if errs:

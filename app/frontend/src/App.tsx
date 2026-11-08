@@ -43,8 +43,28 @@ export default function App() {
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [stages, setStages] = useState<StageStatus[]>([]);
   const [saved, setSaved] = useState<string | null>(null);
+  // the last project step, so toggling back from a tool returns where the user was
+  const [lastStep, setLastStep] = useState<number>(2);
+  // a light project switcher — a popover, not a trip to the home page
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [allProjects, setAllProjects] = useState<ProjectSummary[]>([]);
+  // bumped when a step changes the disk (episode created, stage run) so the board refetches
+  const [tick, setTick] = useState(0);
 
   useEffect(() => applyTheme(theme), [theme]);
+  useEffect(() => {
+    if (typeof step === "number" && step > 0) setLastStep(step);
+  }, [step]);
+
+  // Esc closes the project switcher
+  useEffect(() => {
+    if (!switcherOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSwitcherOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [switcherOpen]);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -87,7 +107,7 @@ export default function App() {
     return () => {
       alive = false;
     };
-  }, [slug, step]);
+  }, [slug, step, tick]);
 
   const cycleTheme = () =>
     setTheme(THEMES[(THEMES.findIndex((t) => t.id === theme) + 1) % THEMES.length].id);
@@ -97,8 +117,13 @@ export default function App() {
     setStep(2); // 프로젝트 설정
   };
   const newProject = () => {
+    setSwitcherOpen(false);
     setSlug(null);
     setStep(1); // 프로젝트 생성(모드 선택)
+  };
+  const openSwitcher = () => {
+    setSwitcherOpen(true);
+    api.projects().then(setAllProjects).catch(() => setAllProjects([]));
   };
 
   return (
@@ -114,17 +139,76 @@ export default function App() {
             <span className="brand-word">ComicMaker</span>
             <span className="brand-line">MOSS-Image 프롬프터</span>
           </button>
-          {project && (
-            <>
-              <span aria-hidden style={{ color: "var(--border)" }}>│</span>
-              <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", lineHeight: 1.15, gap: 1, minWidth: 0 }}>
-                <span style={{ fontSize: "0.68rem", fontWeight: 600, color: "var(--fg-muted)", letterSpacing: "0.05em" }}>프로젝트</span>
-                <strong style={{ fontSize: "1.2rem", fontWeight: 800, letterSpacing: "-0.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {project.title?.ko || project.title?.en || project.slug}
-                </strong>
-              </div>
-            </>
-          )}
+
+          {/* one workspace at a time — the project, or the illustration tool. A
+              radio-style pair, not two loose buttons: the inactive side is dimmed
+              and clicking it switches back. */}
+          <div className="ws-switcher">
+            <div className="ws-toggle" role="tablist" aria-label="작업 영역">
+              {project && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={step !== -2}
+                  aria-haspopup="menu"
+                  aria-expanded={switcherOpen}
+                  className="ws-tab"
+                  title={step === -2 ? "프로젝트로 돌아가기" : "다른 프로젝트 선택"}
+                  onClick={() => {
+                    // in the tool -> back to the project; already in the project ->
+                    // open a light switcher. The project is never unselected here.
+                    if (step === -2) setStep(lastStep);
+                    else if (switcherOpen) setSwitcherOpen(false);
+                    else openSwitcher();
+                  }}
+                >
+                  <span className="ws-tab-kind">프로젝트 ▾</span>
+                  <span className="ws-tab-name">{project.title?.ko || project.title?.en || project.slug}</span>
+                </button>
+              )}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={step === -2}
+                className="ws-tab"
+                title="프로젝트 없이 일러스트 프롬프트를 즉석에서 만듭니다"
+                onClick={() => { setSwitcherOpen(false); setStep(-2); }}
+              >
+                <span className="ws-tab-kind">도구</span>
+                <span className="ws-tab-name">Illustration</span>
+              </button>
+            </div>
+
+            {switcherOpen && (
+              <>
+                <div className="ws-menu-backdrop" onClick={() => setSwitcherOpen(false)} />
+                <div className="ws-menu" role="menu" aria-label="프로젝트 전환">
+                  <div className="ws-menu-head">프로젝트 전환</div>
+                  {allProjects.length === 0 && <div className="ws-menu-empty muted">프로젝트가 없습니다.</div>}
+                  {allProjects.map((p) => (
+                    <button
+                      key={p.slug}
+                      type="button"
+                      role="menuitem"
+                      className="ws-menu-item"
+                      aria-current={p.slug === slug ? "true" : undefined}
+                      onClick={() => { setSwitcherOpen(false); openProject(p.slug); }}
+                    >
+                      <span className="ws-menu-title">{p.title?.ko || p.title?.en || p.slug}</span>
+                      <span className="ws-menu-meta">{p.mode} · {p.episodes.length}화</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="ws-menu-all"
+                    onClick={() => { setSwitcherOpen(false); setSlug(null); setStep(null); }}
+                  >
+                    전체 프로젝트 목록 →
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="appbar-right">
@@ -136,14 +220,6 @@ export default function App() {
           <button className="btn btn--primary" onClick={newProject} title="새 프로젝트 만들기">
             <span aria-hidden>＋</span> 새 프로젝트
           </button>
-          <button
-            className="btn"
-            aria-current={step === -2 ? "true" : undefined}
-            onClick={() => setStep(-2)}
-            title="프로젝트 없이 일러스트 프롬프트를 즉석에서 만듭니다"
-          >
-            <span aria-hidden>🖼️</span> Illustration
-          </button>
           <button className="btn" onClick={cycleTheme} title="누르면 테마가 바뀝니다" aria-label="테마 전환">
             <span aria-hidden>{THEMES.find((t) => t.id === theme)?.icon ?? "🎨"}</span>
             {THEMES.find((t) => t.id === theme)?.label ?? theme}
@@ -152,7 +228,8 @@ export default function App() {
         </div>
       </header>
 
-      {project && (
+      {/* the board belongs to a project workspace only — hidden in the tools */}
+      {project && typeof step === "number" && step > 0 && (
         <ProductionBoard
           slug={slug}
           mode={project.mode}
@@ -177,6 +254,7 @@ export default function App() {
             onStep={setStep}
             onLang={setLang}
             onProviders={() => setStep(-1)}
+            onChanged={() => setTick((t) => t + 1)}
           />
         )}
       </main>

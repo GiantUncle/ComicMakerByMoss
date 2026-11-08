@@ -9,6 +9,7 @@ import StepStory from "./steps/StepStory";
 import StepSettings from "./steps/StepSettings";
 import Preview from "./Preview";
 import Workbench from "./Workbench";
+import ComicPrompts from "./ComicPrompts";
 
 /**
  * The step screen.
@@ -41,6 +42,7 @@ export default function Wizard({
   onStep,
   onLang,
   onProviders,
+  onChanged,
 }: {
   lang: Lang;
   slug: string | null;
@@ -49,6 +51,7 @@ export default function Wizard({
   onStep: (n: number) => void;
   onLang: (lang: Lang) => void;
   onProviders: () => void;
+  onChanged?: () => void;
 }) {
   const init = readWizardUrl();
   const [project, setProject] = useState<ProjectSummary | null>(null);
@@ -141,6 +144,8 @@ export default function Wizard({
     if (!slug) return;
     api.projects().then((all) => setProject(all.find((x) => x.slug === slug) ?? null)).catch((e) => setError(String(e)));
     if (ep) api.stages(slug, ep).then(setStages).catch(() => {});
+    // the shell's board and header also read the disk — tell them it changed
+    onChanged?.();
   }
 
   async function createProject(body: Parameters<typeof api.createProject>[0]) {
@@ -281,7 +286,9 @@ export default function Wizard({
 
       {slug && project && step === 6 && renderStage(mode === "comic" ? "comic-6-scene" : "manga-6-conti")}
 
-      {slug && project && step === 7 && mode === "comic" && renderStage("comic-7-prompts")}
+      {slug && project && step === 7 && mode === "comic" && (
+        <ComicPrompts slug={slug} ep={ep ?? ""} pages={pages} lang={lang} onLang={onLang} tier={project.canvas?.tier ?? "M"} />
+      )}
 
       {slug && project && step === 7 && mode !== "comic" && (
         <div className="stack" style={{ gap: "var(--s-4)" }}>

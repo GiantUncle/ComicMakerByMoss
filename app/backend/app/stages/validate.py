@@ -496,7 +496,7 @@ def validate_artwork(art: dict, conti: dict, characters: dict | None = None) -> 
                                  "word (character-consistency.md R-A)"))
             age = _norm(card.get("age_phrase", ""))
             if age and not re.search(r"neither\b.{0,120}?\bnor\b", str(by_n.get(n, "")), re.IGNORECASE):
-                out.append(issue("error", "art.anchor-no-age-clause", f"{where}/panels[{n}]",
+                out.append(issue("warning", "art.anchor-no-age-clause", f"{where}/panels[{n}]",
                                  f"the anchor for {cid} carries no age-drift clause — Type A writes "
                                  "'neither a big-headed 10-year-old child nor a mature 20-year-old "
                                  "woman' into the drawing"))

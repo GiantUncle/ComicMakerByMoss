@@ -101,6 +101,7 @@ class ComicPageIn(BaseModel):
     episode: str
     page: int
     lang: str | None = None       # ko | en | ja — recompiles the lettering
+    tier: str | None = None       # S | M | L | XL — recompiles at another size
 
 
 @router.post("/comic-page")
@@ -126,14 +127,17 @@ def post_comic_page(body: ComicPageIn) -> dict[str, Any]:
     lang = body.lang or project.get("languages", {}).get("default", "ko")
     if lang not in ("ko", "en", "ja"):
         raise HTTPException(400, f"unknown language {lang!r}")
+    tier = body.tier or project.get("canvas", {}).get("tier", "M")
+    if tier not in TIERS:
+        raise HTTPException(400, f"unknown canvas tier {tier!r}")
 
     characters = {c["id"]: c for c in bible.get("characters", [])}
-    draft = build.compile_single_frame(scene, project, characters, lang)
+    draft = build.compile_single_frame(scene, project, characters, lang, tier_override=tier)
     prompt = build.compile_draft(draft)
     data = json.loads(prompt[prompt.index("{"):])
     return {
         "lang": lang,
-        "tier": project.get("canvas", {}).get("tier", "M"),
+        "tier": tier,
         "prompt": prompt,
         "negative": build.negative(build.negative_style(project)),
         "preview": preview.build(data, draft["width"], draft["height"]),

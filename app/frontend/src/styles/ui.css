@@ -102,6 +102,105 @@
   font-size: var(--text-sm);
 }
 
+/* workspace toggle — the project and the illustration tool are one radio pair */
+.ws-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.ws-tab {
+  display: grid;
+  gap: 0;
+  text-align: left;
+  padding: var(--s-1) var(--s-4);
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.ws-tab + .ws-tab { border-left: 1px solid var(--border); }
+.ws-tab[aria-selected="true"] { background: var(--surface); color: var(--fg); }
+.ws-tab:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.ws-tab-kind {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.ws-tab-name {
+  font-size: var(--text-base);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+/* the light project switcher — a popover that switches projects without
+   leaving the one you are in */
+.ws-switcher { position: relative; }
+.ws-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+.ws-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  min-width: 280px;
+  max-height: 60vh;
+  overflow: auto;
+  display: grid;
+  gap: 2px;
+  padding: var(--s-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+.ws-menu-head {
+  padding: var(--s-1) var(--s-2);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.ws-menu-item {
+  display: grid;
+  gap: 1px;
+  text-align: left;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.ws-menu-item:hover { background: var(--surface-2); }
+.ws-menu-item:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.ws-menu-item[aria-current="true"] { border-color: var(--primary); }
+.ws-menu-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-menu-meta { font-size: 11px; color: var(--fg-muted); }
+.ws-menu-empty { padding: var(--s-2) var(--s-3); font-size: var(--text-sm); }
+.ws-menu-all {
+  margin-top: var(--s-1);
+  padding: var(--s-2) var(--s-3);
+  text-align: left;
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ws-menu-all:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
 /* The resolution readout. It is the size of the answer, not of a footnote. */
 .res {
   display: flex;

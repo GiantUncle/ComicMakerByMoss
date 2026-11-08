@@ -174,6 +174,15 @@ export interface IllustrationResult {
   art_style: string;
 }
 
+export interface ComicPageResult {
+  lang: string;
+  tier: string;
+  prompt: string;
+  negative: string;
+  preview: PreviewModel;
+  characters: string[];
+}
+
 export interface Favorite {
   id: string;
   title: string;
@@ -316,6 +325,12 @@ export const api = {
       split: "even" | "single";
       panel_count: number;
     }>("/api/derive/page", {
+      method: "POST",
+      body: JSON.stringify({ slug, episode, page, lang, tier }),
+    }),
+
+  comicPage: (slug: string, episode: string, page: number, lang: string, tier: string) =>
+    req<ComicPageResult>("/api/derive/comic-page", {
       method: "POST",
       body: JSON.stringify({ slug, episode, page, lang, tier }),
     }),

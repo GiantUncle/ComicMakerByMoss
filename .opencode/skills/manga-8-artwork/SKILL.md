@@ -91,6 +91,14 @@ coordinates, and you never state them. You decide what is *drawn inside* them.
      comic dialogue text in clean speech bubbles*. Name this page's own
      language(s) from `project.json` → `languages.all`, by name (Korean,
      English, Japanese).
+   - **What is rendered fine and what stays loose** — Type A's *selective
+     focus*: `finely rendered, luminous facial features, glistening
+     highlights, and delicate hair strands against breathable painterly
+     brushwork`. This contrast is what makes a painterly page read as a
+     decision instead of an unfinished drawing.
+   - **The format.** Type A opens by naming it: *fully colored 2-panel vertical
+     2D digital painting comic (2koma)* — the reader knows the shape of the page
+     before a single caption.
    - The page's **cast index** under it, one line per figure on the page in the
      form `the young woman: soft oval face, calm dark eyes, low ponytail, mole
      under left eye.` — the `identifier_label`, then the card's anchors. It is

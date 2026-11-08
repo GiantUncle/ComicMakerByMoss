@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type ProjectSummary } from "../../api";
 import { Note } from "../../components/ui";
-import { TIERS, pxLabel } from "../../lib/canvas";
+import TierPicker from "../../components/TierPicker";
 
 /**
  * Step 3 — 프로젝트 설정.
@@ -192,20 +192,7 @@ export default function StepSettings({
 
         <div className="field settings-span-2" style={{ margin: 0 }}>
           <label>캔버스 해상도</label>
-          <div className="tierpick" style={{ flexWrap: "wrap" }}>
-            {TIERS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className="btn toggle"
-                aria-pressed={draft.tier === t.id}
-                title={`${t.id} — ${pxLabel(t.id)}`}
-                onClick={() => set({ tier: t.id })}
-              >
-                {t.id} · {t.w}×{t.h}
-              </button>
-            ))}
-          </div>
+          <TierPicker value={draft.tier} onChange={(t) => set({ tier: t })} label="캔버스 해상도" />
         </div>
 
         <div className="field settings-span-2" style={{ margin: 0 }}>

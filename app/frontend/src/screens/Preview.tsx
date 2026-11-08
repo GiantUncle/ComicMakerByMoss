@@ -7,8 +7,9 @@ import {
   type PreviewShape,
 } from "../api";
 import ManuscriptPreview from "../components/ManuscriptPreview";
+import TierPicker from "../components/TierPicker";
 import { EmptyState, KV, Note } from "../components/ui";
-import { TIERS, pxLabel } from "../lib/canvas";
+import { pxLabel } from "../lib/canvas";
 import { KIND_LABEL, countKinds, isVertical, letteringKind, tailDir } from "../lib/lettering";
 
 /**
@@ -190,23 +191,10 @@ export default function Preview({
             ))}
           </div>
           <span className="muted" style={{ fontSize: "var(--text-sm)", marginLeft: "var(--s-2)" }}>출력 해상도</span>
-          <div className="row" style={{ gap: "var(--s-1)" }} role="group" aria-label="출력 해상도">
-            {TIERS.map((t) => (
-              <button
-                key={t.id}
-                className="btn toggle"
-                aria-pressed={tier === t.id}
-                onClick={() => onTier(t.id)}
-                title={`${t.id} — ${pxLabel(t.id)} · ${t.note}`}
-              >
-                {t.id}
-              </button>
-            ))}
-          </div>
-          <span className="chip" title="현재 출력 해상도">{pxLabel(tier)}</span>
+          <TierPicker value={tier} onChange={onTier} label="출력 해상도" />
         </div>
         <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>
-          현재 선택: {lang.toUpperCase()} · {tier} ({pxLabel(tier)}). 미리보기 그림은 고정되고, 언어/해상도는 복사·출력용 프롬프트에만 적용됩니다(번역 아님).
+          미리보기 그림은 고정되고, 언어·해상도는 복사·출력용 프롬프트에만 적용됩니다(번역 아님).
         </p>
       </div>
 

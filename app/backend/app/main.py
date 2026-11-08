@@ -21,9 +21,12 @@ from .stages.router import router as stages_router
 
 app = FastAPI(title="ComicMaker", version="0.3.0")
 
+# The Vite dev server may land on a different port (5173 in use -> 5174). Any
+# localhost origin is fine for a local tool, so match the host, not one port.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_methods=["*"],
     allow_headers=["*"],
 )
