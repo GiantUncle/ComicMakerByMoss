@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -654,12 +655,17 @@ def compile_single_frame(
     scene_text = str(scene.get("scene", "")).strip()
     # each present figure's canonical descriptor, lead first; §9 keeps its
     # `Apparent age group:` head at the head, and the scene/action follows.
-    descs = [
-        str(characters[c]["descriptor"]).strip()
-        for c in present
-        if characters.get(c, {}).get("descriptor")
-    ]
-    head = " ".join(descs)
+    head_parts: list[str] = []
+    for c in present:
+        d = str(characters.get(c, {}).get("descriptor") or "").strip()
+        if not d:
+            continue
+        # only the first figure keeps its `Apparent age group:` head; stacked
+        # copies read as a stutter in one caption
+        if head_parts:
+            d = re.sub(r"^\s*Apparent age group:\s*[^.]*\.\s*", "", d, count=1, flags=re.I).strip()
+        head_parts.append(d)
+    head = " ".join(head_parts)
     body_text = f"{head} {scene_text}".strip() if head else scene_text
     # continuity: page N is not a fresh picture — it is the next frame of one
     # running moment. Without this the model invents a new mood each page.

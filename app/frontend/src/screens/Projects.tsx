@@ -45,22 +45,22 @@ export default function Projects({
         <div className="stack-tight">
           <h1 style={{ margin: 0, fontSize: "var(--text-2xl)" }}>프로젝트</h1>
           <p className="step-blurb">
-            프로젝트 설정 후 스토리 · 캐스트 · 레퍼런스 시트 · 페이지 계획 · 컷 · 프롬프트 순서로 진행합니다.
-            프로젝트를 열면 왼쪽에 단계가 나타나고, 어느 단계에서든 결과를 보고 고칠 수 있습니다.
+            프로젝트 설정 후 스토리 · 콘티 · 프롬프트 순서로 진행합니다. 프로젝트를 열면 위에 단계가
+            나타나고, 어느 단계에서든 결과를 보고 고칠 수 있습니다.
           </p>
         </div>
-        <button className="btn btn--primary" onClick={onNew}>
-          + 새 프로젝트
-        </button>
+        {/* the app bar already carries "+ 새 프로젝트"; one primary action per screen */}
       </div>
 
       {items.length === 0 && (
         <div className="empty">
           <span className="empty-title">아직 프로젝트가 없습니다.</span>
           <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-            <strong>+ 새 프로젝트</strong>로 시작하세요. 모든 질문에 기본값이 있어 그냥 계속 눌러도
-            끝까지 갑니다.
+            모든 질문에 기본값이 있어 그냥 계속 눌러도 끝까지 갑니다.
           </span>
+          <button className="btn btn--primary" onClick={onNew}>
+            + 새 프로젝트
+          </button>
         </div>
       )}
 

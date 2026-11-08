@@ -17,7 +17,7 @@ export const STYLE_PRESETS: StylePreset[] = [
     id: "painterly",
     label: "2D 페인팅 만화",
     prompt:
-      "2D digital painting comic, finely rendered luminous facial features and delicate hair strands against breathable painterly brushwork, selective focus",
+      "2D digital painting comic with selective focus: finely rendered luminous facial features, glistening highlights and delicate hair strands against breathable painterly brushwork; a muted, sophisticated color palette under soft, readable light; crisp dialogue lettering in clean opaque speech bubbles; zero rough sketch lines",
   },
   {
     id: "clean",

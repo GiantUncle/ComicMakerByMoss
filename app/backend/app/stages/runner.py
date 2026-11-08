@@ -1495,9 +1495,14 @@ def _run_comic_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback,
         if prev.get("moment"):
             bits.append(f"It continues directly from the previous frame: {str(prev['moment']).strip().rstrip('.')}.")
         if pp.get("state_in"):
-            bits.append(f"It opens in the state carried in: {str(pp['state_in']).strip().rstrip('.')}.")
-        if pp.get("change"):
-            bits.append(f"The only thing that changes here: {str(pp['change']).strip().rstrip('.')}.")
+            si = re.sub(r"^\s*page\s*\d+\s*[:.\-]\s*", "", str(pp["state_in"]), flags=re.I).strip().rstrip(".")
+            if si:
+                bits.append(f"It opens in the state carried in: {si}.")
+        # `change` belongs to page 2 onward — page 1 has nothing before it
+        if n >= 2 and pp.get("change"):
+            ch = re.sub(r"^\s*page\s*\d+\s*[:.\-]\s*", "", str(pp["change"]), flags=re.I).strip().rstrip(".")
+            if ch:
+                bits.append(f"The only thing that changes here: {ch}.")
         continuity = " ".join(bits) or None
         draft = build.compile_single_frame(scene, project, characters, lang, continuity=continuity)
         issues += validate.validate_draft(draft, project)

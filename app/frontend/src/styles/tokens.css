@@ -177,7 +177,17 @@ body {
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 .btn:hover:not(:disabled) { background: var(--surface); border-color: var(--fg-muted); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* A disabled control still has to be readable: half-opacity on the primary
+   colour dropped white text to ~2:1. Muting the palette keeps the state
+   obvious without breaking the contrast floor. */
+.btn:disabled,
+.btn--primary:disabled,
+.btn--danger:disabled {
+  background: var(--surface);
+  color: var(--fg-muted);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
 .btn--primary { --btn-bg: var(--primary); --btn-fg: var(--primary-fg); --btn-bd: var(--primary); }
 .btn--primary:hover:not(:disabled) {
   background: var(--primary-hover);

@@ -27,8 +27,11 @@ MODES = ("manga", "comic")   # illustration is a top-level tool, not a project (
 # The default drawing style, in one sentence for `summary.caption`. A project
 # carries this so every page looks the same; the user may replace it.
 DEFAULT_STYLE_PROMPT = (
-    "2D digital painting comic, finely rendered luminous facial features and "
-    "delicate hair strands against breathable painterly brushwork, selective focus"
+    "2D digital painting comic with selective focus: finely rendered luminous "
+    "facial features, glistening highlights and delicate hair strands against "
+    "breathable painterly brushwork; a muted, sophisticated color palette under "
+    "soft, readable light; crisp dialogue lettering in clean opaque speech "
+    "bubbles; zero rough sketch lines"
 )
 ROUTES = ("provided", "premise", "genre", "outline")
 # how the dominant panel of a page is spent — a strategy the agent applies, not a rule

@@ -76,8 +76,13 @@ example instead of the story is wrong.
      position the story will change (`zipped to the collar`, `sleeves pushed up`).
      The descriptor is pasted onto every page, so a baked state contradicts the
      action on the page where it changes.
-   - Cover **each item in the §9 list** — do not drop **eye size**, hair style, or
-     the collar/sleeves of the clothing.
+   - Cover **each item in the §9 list, not just the easy ones.** The reference
+     descriptors are long (a lead runs several sentences). In particular never
+     drop: **skin tone** (`fair creamy peach-flushed skin`), **eye size and
+     colour** (`bright expressive light-amber eyes`), **hair texture and style**
+     (`silky dark-brown hair … airy translucent wisps of bangs`), and the
+     collar/sleeves of the clothing. A two-clause descriptor is what makes a face
+     drift — write four or five.
    - **A side is the character's OWN left/right**, never the viewer's:
      `a small mole under her left eye` means *her* left, which falls on the
      viewer's right when she faces the camera. State a side-specific mark once,

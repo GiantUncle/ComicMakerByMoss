@@ -860,7 +860,9 @@ function BlockMade({
   return (
     <div className="stack-tight">
       <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-        {label} — 블록 단위로 4페이지씩 만듭니다
+        {label} — 블록 {block} ({(block - 1) * 4 + 1}–{block * 4}p)
+        {rows[0]?.width && rows[0]?.height ? ` · ${rows[0].width} × ${rows[0].height} px` : ""}
+        {" · 4페이지씩 만듭니다"}
       </span>
       <div className="plan-grid">
         {rows.map((r) => {
@@ -878,7 +880,7 @@ function BlockMade({
                 <span className="plan-card-page mono">{r.page}p</span>
                 <span className="row" style={{ gap: "var(--s-1)", flexWrap: "wrap", justifyContent: "flex-end" }}>
                   <span className="chip">컷 {r.panels ?? 0}</span>
-                  <span className="chip">글자 {r.texts ?? 0}</span>
+                  <span className="chip">텍스트 {r.texts ?? 0}</span>
                 </span>
               </div>
               <div className="plan-card-body">
@@ -892,10 +894,8 @@ function BlockMade({
                   )}
                 </div>
                 <div className="plan-card-info">
-                  <p className="plan-card-job" style={{ margin: 0 }}>
-                    블록 {Math.floor((r.page - 1) / 4) + 1}
-                    {r.width && r.height ? ` · ${r.width} × ${r.height} px` : ""}
-                  </p>
+                  {/* counts and canvas live in the chips and the header line;
+                      this area carries what neither of those says */}
                   {r.template_suggestion && (
                     <span className="mono muted" style={{ fontSize: "11px", wordBreak: "break-all" }}>
                       {r.template_suggestion}
@@ -911,7 +911,7 @@ function BlockMade({
         })}
       </div>
       <p className="muted" style={{ fontSize: "var(--text-sm)", margin: 0 }}>
-        글자 = 말풍선 · 내레이션 · 효과음 · 이름표. 원고 미리보기에서 종류별로 눌러 볼 수 있습니다.
+        텍스트 = 말풍선 · 내레이션 · 효과음 · 이름표. 원고 미리보기에서 종류별로 눌러 볼 수 있습니다.
       </p>
     </div>
   );

@@ -35,8 +35,8 @@ export function CastCardView({
 
   return (
     <div className="card stack">
-      <div className="between">
-        <div className="row" style={{ flexWrap: "wrap" }}>
+      <div className="between" style={{ alignItems: "flex-start" }}>
+        <div className="row" style={{ flexWrap: "wrap", minWidth: 0 }}>
           <span className="mono">{card.id}</span>
           <strong>{name.ko || name.en || name.ja || "—"}</strong>
           {card.reference?.sheet ? (
@@ -46,13 +46,17 @@ export function CastCardView({
           )}
           {card.consistency_risk && <Chip>{card.consistency_risk}</Chip>}
         </div>
-        <div className="row">
-          <button className="btn" style={{ minHeight: 28 }} onClick={() => setOpen(!open)}>
+        <div className="row" style={{ flex: "0 0 auto", flexWrap: "nowrap", gap: "var(--s-1)" }}>
+          <button
+            className="btn"
+            style={{ minHeight: 28, whiteSpace: "nowrap", padding: "0 var(--s-2)" }}
+            onClick={() => setOpen(!open)}
+          >
             {open ? "접기" : "편집"}
           </button>
           <button
             className="btn btn--primary"
-            style={{ minHeight: 28 }}
+            style={{ minHeight: 28, whiteSpace: "nowrap", padding: "0 var(--s-2)" }}
             onClick={() => onSave(draft)}
             disabled={busy}
           >
@@ -60,7 +64,7 @@ export function CastCardView({
           </button>
           <button
             className="btn btn--danger"
-            style={{ minHeight: 28 }}
+            style={{ minHeight: 28, whiteSpace: "nowrap", padding: "0 var(--s-2)" }}
             onClick={() => onDelete(card.id)}
             disabled={busy}
           >

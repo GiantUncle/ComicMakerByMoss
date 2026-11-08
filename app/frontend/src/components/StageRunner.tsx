@@ -340,7 +340,7 @@ export default function StageRunner({  slug,
       : st === "skip"
         ? status?.reason ?? "이 프로젝트에는 없습니다."
         : st === "stale"
-          ? "이전 단계가 바뀌어 현재 결과는 낡았습니다 — 다시 만드세요."
+          ? ""                       // the chip already says it; the banner lists the pages
           : validationFailed
             ? "검증 실패 — 다시 만드세요."
             : st === "done"
