@@ -173,6 +173,9 @@ body {
   border: 1px solid var(--btn-bd);
   border-radius: var(--radius);
   font: inherit; font-weight: 500;
+  /* a button label is one line: at narrow widths wrapping turned
+     "+ 새 프로젝트" into a four-line block that broke the app bar */
+  white-space: nowrap;
   cursor: pointer;
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
