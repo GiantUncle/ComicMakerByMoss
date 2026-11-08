@@ -494,6 +494,12 @@ def validate_artwork(art: dict, conti: dict, characters: dict | None = None) -> 
                 out.append(issue("error", "art.anchor-not-verbatim", f"{where}/panels[{n}]",
                                  f"the panel anchoring {cid} must carry its cast descriptor word for "
                                  "word (character-consistency.md R-A)"))
+            age = _norm(card.get("age_phrase", ""))
+            if age and not re.search(r"neither\b.{0,120}?\bnor\b", str(by_n.get(n, "")), re.IGNORECASE):
+                out.append(issue("error", "art.anchor-no-age-clause", f"{where}/panels[{n}]",
+                                 f"the anchor for {cid} carries no age-drift clause — Type A writes "
+                                 "'neither a big-headed 10-year-old child nor a mature 20-year-old "
+                                 "woman' into the drawing"))
             if PART_ONLY.search(cap):
                 out.append(issue("error", "art.anchor-on-part-frame", f"{where}/panels[{n}]",
                                  f"panel {n} is a part-only frame but it anchors {cid} — a part frame "

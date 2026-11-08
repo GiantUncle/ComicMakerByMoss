@@ -96,6 +96,51 @@ def get_templates(slug: str | None = None) -> list[dict[str, Any]]:
     return out
 
 
+class ComicPageIn(BaseModel):
+    slug: str
+    episode: str
+    page: int
+    lang: str | None = None       # ko | en | ja — recompiles the lettering
+
+
+@router.post("/comic-page")
+def post_comic_page(body: ComicPageIn) -> dict[str, Any]:
+    """Recompile one comic page for a chosen language.
+
+    A comic scene already holds every line in ko/en/ja, so the language button is
+    a recompile, never a translation (design D6): the same frame, the same drawing,
+    only the lettering swapped to the chosen language.
+    """
+    root = projects.PROJECTS / body.slug
+    if not (root / "project.json").is_file():
+        raise HTTPException(404, f"no project {body.slug!r}")
+    scene_path = root / "episodes" / body.episode / "pages" / f"page-{body.page:03d}.scene.json"
+    if not scene_path.is_file():
+        raise HTTPException(404, f"no comic scene for {body.episode} page {body.page}")
+
+    project = json.loads((root / "project.json").read_text(encoding="utf-8"))
+    bible_path = root / "bible" / "characters.json"
+    bible = json.loads(bible_path.read_text(encoding="utf-8")) if bible_path.is_file() else {"characters": []}
+    scene = json.loads(scene_path.read_text(encoding="utf-8"))
+
+    lang = body.lang or project.get("languages", {}).get("default", "ko")
+    if lang not in ("ko", "en", "ja"):
+        raise HTTPException(400, f"unknown language {lang!r}")
+
+    characters = {c["id"]: c for c in bible.get("characters", [])}
+    draft = build.compile_single_frame(scene, project, characters, lang)
+    prompt = build.compile_draft(draft)
+    data = json.loads(prompt[prompt.index("{"):])
+    return {
+        "lang": lang,
+        "tier": project.get("canvas", {}).get("tier", "M"),
+        "prompt": prompt,
+        "negative": build.negative(build.negative_style(project)),
+        "preview": preview.build(data, draft["width"], draft["height"]),
+        "characters": scene.get("characters", []),
+    }
+
+
 class PageIn(BaseModel):
     slug: str
     episode: str

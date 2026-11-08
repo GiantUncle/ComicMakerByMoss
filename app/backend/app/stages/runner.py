@@ -911,6 +911,41 @@ def _pos_hint(bbox: list[float], width: int, height: int) -> str:
     return f"{row}-{band}, {shape}"
 
 
+_STYLE_FILLER = r"(?:textured|painterly|loose|breathable|expressive|violent|gentle|soft|cool|warm)?\s*"
+_STYLE_TAIL = r"(?:\s+(?:bleed|bleeds|wash|washes|stroke|strokes|shading|texture|rendering|lines))?"
+
+
+def _strip_style_words(text: str) -> str:
+    """Remove medium/technique words from a caption.
+
+    Style belongs to the summary; a panel says what it draws. Models keep
+    slipping 'textured brushwork' into captions, so the words are removed
+    mechanically rather than argued with.
+    """
+    out = text
+    for word in validate.STYLE_WORDS:
+        out = re.sub(_STYLE_FILLER + re.escape(word) + _STYLE_TAIL, " ", out, flags=re.IGNORECASE)
+    out = re.sub(r"\s*,\s*(?=[,.])", "", out)     # ", ," and ", ."
+    out = re.sub(r"\s{2,}", " ", out)
+    out = re.sub(r"\s+([.,;:])", r"\1", out)
+    out = re.sub(r"\.\s*\.", ".", out)
+    return out.strip()
+
+
+def _sanitize_artwork(data: dict) -> dict:
+    if not isinstance(data, dict):
+        return data
+    if isinstance(data.get("summary_caption"), str):
+        data["summary_caption"] = re.sub(r"\s{2,}", " ", data["summary_caption"]).strip()
+    for p in data.get("panels", []) or []:
+        if isinstance(p, dict) and isinstance(p.get("caption"), str):
+            p["caption"] = _strip_style_words(p["caption"])
+    for t in data.get("texts", []) or []:
+        if isinstance(t, dict) and isinstance(t.get("caption"), str):
+            t["caption"] = _strip_style_words(t["caption"])
+    return data
+
+
 def _artwork_check(conti: dict, characters: dict | None = None):
     def check(data: dict) -> list[dict]:
         return validate.validate_artwork(data, conti, characters)
@@ -1001,6 +1036,9 @@ def _run_artwork(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages
 
         data, page_issues = _ask_until_valid(stage, system, user, caller,
                                              _artwork_check(conti, cards), feedback)
+        if not validate.errors(page_issues):
+            data = _sanitize_artwork(data)
+            page_issues = validate.validate_artwork(data, conti, cards)
         errs = validate.errors(page_issues)
         issues += page_issues
         if errs:

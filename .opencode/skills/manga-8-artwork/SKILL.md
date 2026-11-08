@@ -67,10 +67,12 @@ coordinates, and you never state them. You decide what is *drawn inside* them.
      sailor-uniform schoolgirl*; a pronoun with nothing to hold on to drifts
      from panel to panel.
 
-     When the card carries an `age_phrase`, write the anti-drift clause into the
-     drawing, the way Type A does — what the figure is **not**: *neither a
-     big-headed 10-year-old child nor a mature 20-year-old woman*. The card's
-     `age_phrase`, `body` and `default_outfit` are part of the figure.
+     When the card carries an `age_phrase`, the anchor drawing carries the
+     anti-drift clause too, the way Type A does — what the figure is **not**:
+     *neither a big-headed 10-year-old child nor a mature 20-year-old woman*.
+     It goes in the same sentence as the descriptor and uses the words
+     "neither" and "nor". The card's `age_phrase`, `body` and `default_outfit`
+     are part of the figure.
 
      State each attribute **once on the page**. The signature — the mole, the
      CRT head — is named in the descriptor and nowhere else; if the action clause

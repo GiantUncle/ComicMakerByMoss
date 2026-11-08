@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, type Lang, type ProjectSummary, type StageStatus } from "./api";
 import { applyTheme, loadTheme, THEMES, type Theme } from "./theme";
-import { stepsFor, stepMeta, stageState } from "./lib/steps";
 import { openEpisodeId } from "./lib/project";
+import ProductionBoard from "./components/ProductionBoard";
 import ModelMenu from "./components/ModelMenu";
 import Projects from "./screens/Projects";
 import Providers from "./screens/Providers";
@@ -12,18 +12,14 @@ import Wizard from "./screens/Wizard";
 /**
  * The shell.
  *
- * The left rail is one project's eight steps — the only thing a user came here
- * to do. Every step is reachable in both directions: open a project, click any
- * step, see what that step made, judge it, and retake it. The manuscript
- * preview and the workbench are tabs inside step 8, not screens of their own.
- * The provider is app setup, so it sits at the bottom of the rail and never
- * competes with the work.
+ * The flow is read left to right on the production board across the top: each
+ * step fills by state, the current step is outlined, and clicking a card opens
+ * that step's page below. There is no vertical rail — the order is the point, so
+ * it reads as a run of steps, not a menu.
  *
- * `step` drives the main area: null is the project list, 1..8 are the steps,
- * -1 is the provider screen.
+ * `step` drives the main area: null is the project list, 1..N are the steps,
+ * -1 is the provider screen, -2 is the illustration tool.
  */
-
-// the language toggle lives in the top bar; the list is in lib/langs
 
 function readUrl() {
   const q = new URLSearchParams(window.location.search);
@@ -36,13 +32,6 @@ function readUrl() {
     slug: slug && slug.trim() ? slug : null,
     step: step !== null && Number.isFinite(step) ? step : null,
   };
-}
-
-type RailState = "done" | "stale" | "ready" | "blocked" | "idle";
-
-interface RailRow {
-  state: RailState;
-  note: string;
 }
 
 export default function App() {
@@ -68,10 +57,9 @@ export default function App() {
     if (next !== cur) window.history.replaceState(null, "", next);
   }, [slug, step, lang]);
 
-  // the rail and the header both read the project's real state off the disk,
-  // so saving a setting inside a step refreshes them on the way out.
-  // stage states are read for the newest episode, because that is the one a
-  // user is working on
+  // the board and the header both read the project's real state off the disk, so
+  // saving a setting inside a step refreshes them on the way out. Stage states
+  // are read for the newest episode, because that is the one a user is working on.
   useEffect(() => {
     if (!slug) {
       setProject(null);
@@ -80,15 +68,12 @@ export default function App() {
       return;
     }
     let alive = true;
-    // the list endpoint enriches every episode with its gates and page count,
-    // which the single-project endpoint does not — so the rail reads the list
     api
       .projects()
       .then((all) => {
         if (!alive) return;
         const p = all.find((x) => x.slug === slug) ?? null;
         setProject(p);
-        // stage states are read for the newest episode, the one being worked on
         api
           .stages(slug, openEpisodeId(p))
           .then((rows) => alive && setStages(rows))
@@ -111,6 +96,10 @@ export default function App() {
     setSlug(s);
     setStep(2); // 프로젝트 설정
   };
+  const newProject = () => {
+    setSlug(null);
+    setStep(1); // 프로젝트 생성(모드 선택)
+  };
 
   return (
     <div className="shell">
@@ -127,9 +116,7 @@ export default function App() {
           </button>
           {project && (
             <>
-              <span aria-hidden style={{ color: "var(--border)" }}>
-                │
-              </span>
+              <span aria-hidden style={{ color: "var(--border)" }}>│</span>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", lineHeight: 1.15, gap: 1, minWidth: 0 }}>
                 <span style={{ fontSize: "0.68rem", fontWeight: 600, color: "var(--fg-muted)", letterSpacing: "0.05em" }}>프로젝트</span>
                 <strong style={{ fontSize: "1.2rem", fontWeight: 800, letterSpacing: "-0.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -146,6 +133,9 @@ export default function App() {
               <span aria-hidden>💾</span> {saved}
             </span>
           )}
+          <button className="btn btn--primary" onClick={newProject} title="새 프로젝트 만들기">
+            <span aria-hidden>＋</span> 새 프로젝트
+          </button>
           <button
             className="btn"
             aria-current={step === -2 ? "true" : undefined}
@@ -162,199 +152,34 @@ export default function App() {
         </div>
       </header>
 
-      <div className="body">
-        <ProjectRail
+      {project && (
+        <ProductionBoard
           slug={slug}
-          step={step}
-          project={project}
+          mode={project.mode}
           stages={stages}
-          onStep={setStep}
-          onNew={() => {
-            setSlug(null);
-            setStep(1); // 프로젝트 생성(모드 선택) — 레일에 표시되지 않음
-          }}
+          current={step}
+          onPick={(n) => setStep(n)}
         />
+      )}
 
-        <main className="main">
-          {step === -1 && <Providers />}
-          {step === -2 && <Illustration onProviders={() => setStep(-1)} />}
-          {step === null && (
-            <Projects
-              lang={lang}
-              onNew={() => { setSlug(null); setStep(1); }}
-              onOpen={openProject}
-            />
-          )}
-          {step !== null && step !== -1 && step !== -2 && (
-            <Wizard
-              lang={lang}
-              slug={slug}
-              step={step}
-              onSlug={setSlug}
-              onStep={setStep}
-              onLang={setLang}
-              onProviders={() => setStep(-1)}
-            />
-          )}
-        </main>
-      </div>
+      <main className="main">
+        {step === -1 && <Providers />}
+        {step === -2 && <Illustration onProviders={() => setStep(-1)} />}
+        {step === null && (
+          <Projects lang={lang} onNew={newProject} onOpen={openProject} />
+        )}
+        {step !== null && step !== -1 && step !== -2 && (
+          <Wizard
+            lang={lang}
+            slug={slug}
+            step={step}
+            onSlug={setSlug}
+            onStep={setStep}
+            onLang={setLang}
+            onProviders={() => setStep(-1)}
+          />
+        )}
+      </main>
     </div>
   );
-}
-
-function ProjectRail({
-  slug,
-  step,
-  project,
-  stages,
-  onStep,
-  onNew,
-}: {
-  slug: string | null;
-  step: number | null;
-  project: ProjectSummary | null;
-  stages: StageStatus[];
-  onStep: (n: number | null) => void;
-  onNew: () => void;
-}) {
-  const mode = project?.mode ?? null;
-  const steps = stepsFor(mode);
-  const done = steps.filter((s) => railRow(s.n, stages, slug, mode).state === "done").length;
-
-  return (
-    <nav className="rail" aria-label="프로젝트 단계">
-      <button className="btn btn--primary" style={{ width: "100%", justifyContent: "center" }} onClick={onNew}>
-        + 새 프로젝트
-      </button>
-
-      {slug && (
-        <>
-          <div className="rail-head" style={{ marginTop: "var(--s-4)" }}>
-            <span className="rail-title">{project?.title?.ko || project?.title?.en || slug}</span>
-            <span className="rail-meta">
-              {project ? project.mode : slug}
-            </span>
-            <span className="rail-meta">
-              {project?.mode === "comic"
-                ? `페이지당 1프레임 · 완료 ${done}/${steps.length} 단계`
-                : `페이지당 컷 ${project?.panels?.min ?? "?"}–${project?.panels?.max ?? "?"} · 완료 ${done}/${steps.length} 단계`}
-            </span>
-          </div>
-
-          <p className="rail-meta" style={{ margin: "var(--s-3) 0 0" }}>
-            한 프로젝트를 만드는 순서입니다. 어디서든 눌러 이동하고, 각 단계의 결과를 보고 고칠 수 있습니다.
-          </p>
-
-          <StepGroup
-            title="프로젝트 전체 — 한 번"
-            steps={steps.filter((s) => s.scope === "project" && s.n !== 1)}
-            step={step}
-            stages={stages}
-            slug={slug}
-            mode={mode}
-            onStep={onStep}
-          />
-          <StepGroup
-            title={mode === "comic" ? "프레임마다 — 새 만화마다 다시" : "에피소드마다 — 새 화마다 다시"}
-            steps={steps.filter((s) => s.scope === "episode")}
-            step={step}
-            stages={stages}
-            slug={slug}
-            mode={mode}
-            onStep={onStep}
-          />
-        </>
-      )}
-
-      {!slug && (
-        <p className="rail-meta" style={{ marginTop: "var(--s-4)" }}>
-          프로젝트를 열거나 새로 만들면 여기에 단계 순서가 나타납니다.
-        </p>
-      )}
-
-      {/* provider setup is not project state — it works with no project open,
-          and the app cannot call a model without it, so it never hides */}
-      <div className="rail-foot">
-        <button
-          className="btn"
-          style={{ justifyContent: "flex-start", gap: "var(--s-2)" }}
-          aria-current={step === -1 ? "true" : undefined}
-          onClick={() => onStep(-1)}
-          title="AI 프로바이더 설정"
-        >
-          <span aria-hidden>⚙️</span>
-          AI 프로바이더 설정
-        </button>
-      </div>
-    </nav>
-  );
-}
-
-function StepGroup({
-  title,
-  steps,
-  step,
-  stages,
-  slug,
-  mode,
-  onStep,
-}: {
-  title: string;
-  steps: ReturnType<typeof stepsFor>;
-  step: number | null;
-  stages: StageStatus[];
-  slug: string | null;
-  mode: string | null;
-  onStep: (n: number) => void;
-}) {  return (
-    <>
-      <div className="rail-group">{title}</div>
-      {steps.map((s) => {
-        const row = railRow(s.n, stages, slug, mode);
-        const active = step === s.n;
-        return (
-          <button
-            key={s.n}
-            className="rail-item"
-            aria-current={active ? "step" : undefined}
-            title={s.blurb}
-            onClick={() => onStep(s.n)}
-          >
-            <span className="rail-num" aria-hidden>
-              {s.n}
-            </span>
-            <span className="rail-text">
-              <span className="rail-label">{s.label}</span>
-              <span className="rail-state">{row.note}</span>
-            </span>
-          </button>
-        );
-      })}
-    </>
-  );
-}
-
-/** What the rail says about a step, read off the stage table. */
-export function railRow(n: number, stages: StageStatus[], slug: string | null, mode?: string | null): RailRow {
-  const meta = stepMeta(n, mode);
-  if (!meta || !slug) return { state: "idle", note: "프로젝트를 여세요" };
-
-  // project settings (step 2) are stored in project.json; treated as done when project exists
-  if (meta.stages.length === 0) return { state: "done", note: "저장되어 있습니다" };
-
-  const rows = meta.stages
-    .map((id) => stages.find((s) => s.id === id))
-    .filter((r): r is StageStatus => !!r);
-
-  if (rows.length === 0) return { state: "ready", note: "열어두었습니다" };
-
-  if (rows.some((r) => stageState(r.state) === "skip")) {
-    return { state: "blocked", note: "이 프로젝트 모드에는 없습니다" };
-  }
-  const stale = rows.find((r) => stageState(r.state) === "stale");
-  if (stale) return { state: "stale", note: stale.reason || "이전 단계 변경됨 · 재작업 필요" };
-  if (rows.every((r) => stageState(r.state) === "done")) return { state: "done", note: "완료" };
-  const waiting = rows.find((r) => stageState(r.state) === "waiting");
-  if (waiting) return { state: "blocked", note: waiting.reason || "다른 단계 먼저" };
-  return { state: "ready", note: "실행할 수 있습니다" };
 }

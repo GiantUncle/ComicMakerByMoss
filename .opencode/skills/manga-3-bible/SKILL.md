@@ -81,7 +81,11 @@ example instead of the story is wrong.
    - **Never** pose, expression, gaze, camera angle, framing, lighting,
      background, art style or medium, a numeric age, or invented names,
      personality or backstory. If several figures are visible, describe one.
-   - **One concise English paragraph** — no headings, bullets or JSON inside it.
+   - **Written as sentences, not a comma list** — 4 to 6 sentences, 70 to 110
+     words. A list of nouns ("a soft oval face, a slender build, fair skin")
+     names the parts but does not draw a person; the reference descriptors
+     describe the silhouette — the chin, the neck, how the hair falls — in
+     prose.
    - **Write positives only.** A descriptor never says what a figure lacks
      (`no hair`, `no skin tone`, `no accessories`): say what is there instead
      (`a bare CRT television head`, `unpainted metal`, `bare hands`). A
