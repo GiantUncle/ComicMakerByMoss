@@ -164,6 +164,35 @@ export interface OrchestrateResult {
   log: OrchestrateRow[];
 }
 
+export interface IllustrationResult {
+  draft: Record<string, unknown>;
+  prompt: string;
+  negative: string;
+  issues: ReviewIssue[];
+  ok: boolean;
+  canvas_tier: string;
+  art_style: string;
+}
+
+export interface Favorite {
+  id: string;
+  title: string;
+  kind: string;
+  canvas_tier: string;
+  art_style: string;
+  brief: string;
+  source: string;
+  tags: string[];
+  created: string;
+  updated: string;
+}
+
+export interface FavoriteBody extends Favorite {
+  prompt?: string;
+  negative?: string;
+  draft?: Record<string, unknown>;
+}
+
 export interface ProviderInfo {
   id: string;
   kind: string;
@@ -381,6 +410,26 @@ export const api = {
   rollbackSkill: (path: string) =>
     req(`/api/skills/rollback?path=${encodeURIComponent(path)}`, { method: "POST" }),
   rollbackAllSkills: () => req("/api/skills/rollback-all", { method: "POST" }),
+
+  generateIllustration: (body: { brief: string; canvas_tier?: string; art_style?: string }) =>
+    req<IllustrationResult>("/api/illustration/generate", { method: "POST", body: JSON.stringify(body) }),
+
+  favorites: () => req<Favorite[]>("/api/favorites"),
+  favorite: (id: string) => req<FavoriteBody>(`/api/favorites/${id}`),
+  saveFavorite: (body: {
+    kind: string;
+    title: string;
+    draft: Record<string, unknown>;
+    prompt: string;
+    negative: string;
+    brief?: string;
+    source?: string;
+    canvas_tier?: string;
+    art_style?: string;
+    tags?: string[];
+  }) => req<Favorite>("/api/favorites", { method: "POST", body: JSON.stringify(body) }),
+  deleteFavorite: (id: string) =>
+    req<{ removed: string }>(`/api/favorites/${id}`, { method: "DELETE" }),
 
   providers: () => req<ProvidersPayload>("/api/providers"),
   saveProvider: (body: {

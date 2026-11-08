@@ -28,6 +28,10 @@ export const STAGE_LABEL: Record<string, string> = {
   "manga-7-sheets": "컷 시트",
   "manga-8-artwork": "원고 — 만화가가 페이지를 그린다",
   "manga-9-prompts": "프롬프트",
+  "comic-1-brief": "브리프",
+  "comic-5-plan": "순간 계획",
+  "comic-6-scene": "장면 — 프레임을 그린다",
+  "comic-7-prompts": "프롬프트",
 };
 
 export default function StageRunner({  slug,
@@ -65,10 +69,10 @@ export default function StageRunner({  slug,
   type BatchItem = { block: number; pages: string; ok: boolean; note?: string; error?: string };
   const [batch, setBatch] = useState<{ running: boolean; mode: "run" | "retake"; current: number; total: number; items: BatchItem[] } | null>(null);
 
-  const perBlock = stage === "manga-6-conti" || stage === "manga-7-sheets" || stage === "manga-8-artwork" || stage === "manga-9-prompts";
-  const pageScoped = stage === "manga-5-plan" || perBlock;
-  const isPlan = stage === "manga-5-plan";
-  const isModelStage = stage === "manga-1-source" || stage === "manga-3-bible" || stage === "manga-5-plan" || stage === "manga-6-conti" || stage === "manga-8-artwork";
+  const perBlock = stage === "manga-6-conti" || stage === "manga-7-sheets" || stage === "manga-8-artwork" || stage === "manga-9-prompts" || stage === "comic-6-scene" || stage === "comic-7-prompts";
+  const pageScoped = stage === "manga-5-plan" || stage === "comic-5-plan" || perBlock;
+  const isPlan = stage === "manga-5-plan" || stage === "comic-5-plan";
+  const isModelStage = stage === "manga-1-source" || stage === "manga-3-bible" || stage === "manga-5-plan" || stage === "manga-6-conti" || stage === "manga-8-artwork" || stage === "comic-1-brief" || stage === "comic-5-plan" || stage === "comic-6-scene";
   const rkey = runKey(slug, ep, stage, perBlock ? block : 1);
   const runState = useSyncExternalStore(subscribeRun, () => getRun(rkey), () => getRun(rkey));
   const { busy: runBusy, result, error } = runState;
@@ -151,6 +155,9 @@ export default function StageRunner({  slug,
         await api.runStage({ slug, stage: "manga-7-sheets", episode: ep, block: b, dry: false });
         await api.runStage({ slug, stage: "manga-8-artwork", episode: ep, block: b, dry: false });
         await api.runStage({ slug, stage: "manga-9-prompts", episode: ep, block: b, dry: false });
+      } else if (stage === "comic-6-scene") {
+        const b = perBlock ? block : 1;
+        await api.runStage({ slug, stage: "comic-7-prompts", episode: ep, block: b, dry: false });
       }
       setRun(rkey, { busy: false, result: r, dry: null });
       reload();
@@ -187,8 +194,10 @@ export default function StageRunner({  slug,
             await api.runStage({ slug, stage: "manga-7-sheets", episode: ep, block: b, dry: false });
             await api.runStage({ slug, stage: "manga-8-artwork", episode: ep, block: b, dry: false });
             await api.runStage({ slug, stage: "manga-9-prompts", episode: ep, block: b, dry: false });
+          } else if (stage === "comic-6-scene") {
+            await api.runStage({ slug, stage: "comic-7-prompts", episode: ep, block: b, dry: false });
           }
-          items.push({ block: b, pages: blockRange(b), ok: true, note: stage === "manga-6-conti" ? "완료 (콘티+시트+원고+프롬프트)" : "완료" });
+          items.push({ block: b, pages: blockRange(b), ok: true, note: stage === "manga-6-conti" ? "완료 (콘티+시트+원고+프롬프트)" : stage === "comic-6-scene" ? "완료 (장면+프롬프트)" : "완료" });
         } catch (e) {
           items.push({ block: b, pages: blockRange(b), ok: false, error: String(e) });
           setBatch({ running: false, mode, current: b, total, items: [...items] });
@@ -274,6 +283,9 @@ export default function StageRunner({  slug,
             await api.runStage({ slug, stage: "manga-7-sheets", episode: ep, block: b, dry: false, pages: sel });
             await api.runStage({ slug, stage: "manga-8-artwork", episode: ep, block: b, dry: false, pages: sel });
             await api.runStage({ slug, stage: "manga-9-prompts", episode: ep, block: b, dry: false, pages: sel });
+          } else if (stage === "comic-6-scene") {
+            const sel = byBlock.get(b);
+            await api.runStage({ slug, stage: "comic-7-prompts", episode: ep, block: b, dry: false, pages: sel });
           }
           items.push({ block: b, pages: (byBlock.get(b) || []).join(",") + "p", ok: true, note: "완료" });
         } catch (e) {

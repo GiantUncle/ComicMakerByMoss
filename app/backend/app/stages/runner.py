@@ -79,6 +79,12 @@ def _rel(root: Path, path: Path) -> str:
     return path.relative_to(root).as_posix()
 
 
+def _source_text(root: Path, ep: str) -> str:
+    """An episode's source text — the manga novel, or a comic's brief."""
+    src = root / "episodes" / ep / "source"
+    return _read_text(src / "novel.txt") or _read_text(src / "brief.md")
+
+
 def _stage_files(root: Path, stage: Stage, ep: str | None) -> list[str]:
     """The stage's own files that already exist — what a run would overwrite."""
     out: list[str] = []
@@ -432,7 +438,7 @@ def _bible_check(project: dict, cast_hint: list[str]):
 def _run_bible(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, ids, cuts, block, episode_pages=None) -> dict:
     project = _read_json(root / "project.json")
     episode = _read_json(root / "episodes" / ep / "episode.json")
-    source = _read_text(root / "episodes" / ep / "source" / "novel.txt")
+    source = _source_text(root, ep)
     existing = _read_json(root / "bible" / "characters.json", {"characters": [], "objects": []})
 
     replace_ids = set(ids) if ids else None
@@ -1012,20 +1018,32 @@ def _apply_artwork(sheet: dict, art: dict) -> dict:
     if str(art.get("summary_caption", "")).strip():
         summary["caption"] = str(art["summary_caption"]).strip()
 
-    panels = sorted(art.get("panels", []), key=lambda p: int(p.get("n", 0)))
-    captions = [str(p.get("caption", "")).strip() for p in panels]
-    texts = {t.get("id"): str(t.get("caption", "")).strip() for t in art.get("texts", [])}
+    panels = {int(p.get("n", 0)): str(p.get("caption", "")).strip() for p in art.get("panels", [])}
+    texts = {str(t.get("id")): str(t.get("caption", "")).strip() for t in art.get("texts", [])}
+    # fallbacks, used only for sheets written before the wiring keys existed:
+    # build sorts text boxes by id, and drawn boxes by panel number.
+    panel_order = [panels[n] for n in sorted(panels)]
+    text_order = [texts[k] for k in sorted(texts)]
 
     drawn_i = 0
     text_i = 0
     for item in out.get("items", []):
         if item.get("label") == "text":
-            cap = texts.get(item.get("ref_id"))
-            if cap is None and text_i < len(texts):
-                cap = list(texts.values())[text_i]
+            cap = texts.get(str(item.get("ref_id")))
+            if cap is None:
+                cap = text_order[text_i] if text_i < len(text_order) else None
             text_i += 1
         else:
-            cap = captions[drawn_i] if drawn_i < len(captions) else None
+            n = None
+            note = str(item.get("note", ""))
+            if note.startswith("panel-"):
+                try:
+                    n = int(note.split("-", 1)[1])
+                except ValueError:
+                    n = None
+            cap = panels.get(n) if n is not None else None
+            if cap is None:
+                cap = panel_order[drawn_i] if drawn_i < len(panel_order) else None
             drawn_i += 1
         if cap:
             item["caption"] = cap
@@ -1088,6 +1106,250 @@ def _run_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages
     return res
 
 
+# ================================================================ comic stages
+def _comic_brief_text(root: Path, ep: str) -> str:
+    """The comic brief — brief.md, else the wizard's novel.txt (comic saves either)."""
+    src = root / "episodes" / ep / "source"
+    return _read_text(src / "brief.md") or _read_text(src / "novel.txt")
+
+
+def _run_comic_brief(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, ids, cuts, block, episode_pages=None) -> dict:
+    """Stage comic-1: accept the moment-sequence brief. No novel, just a brief."""
+    eproot = root / "episodes" / ep
+    episode = _read_json(eproot / "episode.json")
+    gate = eproot / "source" / "APPROVED"
+    if gate.is_file() and not feedback:
+        return {"note": "source gate already stamped", "files": [], "issues": []}
+
+    brief = eproot / "source" / "brief.md"
+    novel = eproot / "source" / "novel.txt"
+    road = episode.get("source_origin", "provided")
+
+    if road == "provided":
+        text = _read_text(brief).strip() or _read_text(novel).strip()
+        if not text:
+            raise StageError("브리프가 없습니다. 위저드에서 짧은 이야기를 입력하세요.")
+        _write_text(brief, text if text.endswith("\n") else text + "\n")
+        _write_text(gate, f"provided · {_today()}\n")
+        return {"note": "brief kept verbatim",
+                "files": [_rel(root, brief), _rel(root, gate)], "issues": []}
+
+    raw = _read_text(brief).strip() or _read_text(novel).strip()
+    if not raw:
+        raise StageError("전제/장르/개요가 없습니다. 위저드에서 입력하세요.")
+    project = _read_json(root / "project.json")
+    system = _system_prompt(stage)
+    user = (
+        f"# Project\n{_project_brief(project, episode)}\n\n"
+        f"# Road\n{road}\n\n"
+        f"# Input\n{raw}\n\n"
+        f"# Task\nWrite this comic's brief now, exactly as this stage's document "
+        "defines. Plain prose only — no title, no JSON, no commentary."
+    )
+    if feedback:
+        user += f"\n\n# The user asks\n{feedback.strip()}"
+    if dry:
+        return {"dry": True, "system": system, "user": user}
+
+    text = str(_ask(stage, system, user, caller, json_mode=False)).strip()
+    if len(text) < 80:
+        raise StageError("the authored brief is too short to be usable")
+    _write_text(brief, text + "\n")
+    _write_text(gate, f"{road} · {_today()}\n")
+    return {"note": f"authored from {road}",
+            "files": [_rel(root, brief), _rel(root, gate)], "issues": []}
+
+
+def _comic_plan_check(project: dict):
+    def check(data: dict) -> list[dict]:
+        return validate.validate_comic_plan(data, project)
+    return check
+
+
+def _run_comic_plan(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, ids, cuts, block, episode_pages=None) -> dict:
+    """Stage comic-5: plan the pages as a sequence of still moments (no cuts)."""
+    project = _read_json(root / "project.json")
+    episode = _read_json(root / "episodes" / ep / "episode.json")
+    brief = _comic_brief_text(root, ep)
+
+    prev = _read_json(root / "episodes" / ep / "plan" / "comic-plan.json", None)
+    existing_block = ""
+    scope = ""
+    if prev and pages:
+        existing_block = f"\n# Current plan\n{json.dumps(prev, ensure_ascii=False, indent=2)}\n"
+        scope = (
+            f"Rewrite ONLY pages {sorted(set(pages))}, keeping page_total at "
+            f"{prev.get('page_total')}. Return those pages only:\n"
+        )
+
+    raw_target = episode_pages if episode_pages is not None else project.get("episode_pages")
+    try:
+        target_pages = int(raw_target) if raw_target is not None else 4
+    except Exception:
+        target_pages = 4
+    target_pages = max(4, min(32, round(target_pages / 4) * 4))
+
+    system = _system_prompt(stage)
+    base = (
+        f"# Project\n{_project_brief(project, episode)}\n"
+        f"{existing_block}\n"
+        f"# Brief\n{brief}\n\n"
+        f"# Task\nPlan this comic as exactly {target_pages} still frames "
+        f"(page_total = {target_pages}), exactly as this stage's document defines.\n"
+        + scope + "Return the plan object it defines."
+    )
+    if dry:
+        return {"dry": True, "system": system, "user": base}
+
+    if prev and pages:
+        def check(data: dict) -> list[dict]:
+            merged = {**prev, "pages": _merge_pages(prev.get("pages", []), data.get("pages", []))}
+            merged["page_total"] = prev.get("page_total")
+            return validate.validate_comic_plan(merged, project)
+
+        data, issues = _ask_until_valid(stage, system, base, caller, check, feedback)
+        if validate.errors(issues):
+            raise StageError("the comic plan still fails validation: " + _first_error(issues))
+        plan = {**prev, "pages": _merge_pages(prev.get("pages", []), data.get("pages", []))}
+        plan.setdefault("slug", prev.get("slug", root.name))
+        plan.setdefault("moment_basis", prev.get("moment_basis", ""))
+    else:
+        data, issues = _ask_until_valid(stage, system, base, caller, _comic_plan_check(project), feedback)
+        if validate.errors(issues):
+            raise StageError("the comic plan still fails validation: " + _first_error(issues))
+        plan = data
+
+    page_total = int(plan["page_total"])
+    plan["page_total"] = page_total
+    pages_out = sorted(plan.get("pages", []), key=lambda p: int(p.get("page", 0)))
+    for i, page in enumerate(pages_out, start=1):
+        page.setdefault("page", i)
+        page["block"] = block_of(int(page["page"]))
+    plan["pages"] = pages_out
+
+    plan_path = root / "episodes" / ep / "plan" / "comic-plan.json"
+    _write_json(plan_path, plan)
+    episode["page_total"] = page_total
+    _write_json(root / "episodes" / ep / "episode.json", episode)
+    gate = root / "episodes" / ep / "plan" / "APPROVED"
+    _write_text(gate, f"{plan.get('moment_basis', '')} · {_today()}\n")
+    return {"note": f"{page_total} frames planned",
+            "files": [_rel(root, plan_path), _rel(root, gate)], "issues": issues}
+
+
+def _run_comic_scene(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, ids, cuts, block, episode_pages=None) -> dict:
+    """Stage comic-6: one still frame + lettering per page (no panels)."""
+    project = _read_json(root / "project.json")
+    tier = project.get("canvas", {}).get("tier", "M")
+    width, height = build.tier_size(tier)
+    episode = _read_json(root / "episodes" / ep / "episode.json")
+    plan = _read_json(root / "episodes" / ep / "plan" / "comic-plan.json")
+    bible = _read_json(root / "bible" / "characters.json", {"characters": [], "objects": []})
+    brief = _comic_brief_text(root, ep)
+
+    cards = {c["id"]: c for c in bible.get("characters", [])}
+    cast = [cards[c] for c in episode.get("cast", []) if c in cards]
+
+    page_total = int(plan.get("page_total", len(plan.get("pages", []))))
+    block = _block_from_pages(pages) if pages else block
+    wanted = block_pages(page_total, block)
+    selected = [p for p in (pages or wanted) if p in wanted] or wanted
+    slice_ = [p for p in plan.get("pages", []) if int(p.get("page", 0)) in set(selected)]
+    if not slice_:
+        raise StageError(f"no comic-plan pages for {selected}")
+
+    system = _system_prompt(stage)
+    base = (
+        f"# Project\n{_project_brief(project, episode)}\n\n"
+        f"# Canvas\n{width} x {height} px\n\n"
+        f"# Cast cards\n{json.dumps(cast, ensure_ascii=False, indent=2)}\n\n"
+        f"# Plan (pages {selected[0]}..{selected[-1]})\n"
+        f"{json.dumps(slice_, ensure_ascii=False, indent=2)}\n\n"
+        f"# Brief\n{brief}\n\n"
+        f"# Task\nDraw the scene for each of pages {selected} now, exactly as this "
+        f"stage's document defines. Return {{\"pages\": [<scene>...]}} for those pages only."
+    )
+    if feedback:
+        base += f"\n\n# The user asks\n{feedback.strip()}"
+    if dry:
+        return {"dry": True, "system": system, "user": base}
+
+    def check(data: dict) -> list[dict]:
+        scenes = data.get("pages") or (data if isinstance(data, list) else [])
+        out: list[dict] = []
+        if not scenes:
+            out.append(validate.issue("error", "comic-scene.none", "reply", "no pages in the reply"))
+        for sc in scenes:
+            out += validate.validate_comic_scene(sc, project)
+        return out
+
+    data, issues = _ask_until_valid(stage, system, base, caller, check, feedback)
+    if validate.errors(issues):
+        raise StageError("the scene still fails validation: " + _first_error(issues))
+
+    scenes = data.get("pages") or (data if isinstance(data, list) else [])
+    files = []
+    for sc in scenes:
+        n = int(sc.get("page", 0))
+        if n not in selected:
+            continue
+        p = root / "episodes" / ep / "pages" / f"page-{n:03d}.scene.json"
+        _write_json(p, sc)
+        files.append(_rel(root, p))
+    return {"note": f"comic scenes for pages {selected[0]}..{selected[-1]}", "files": files, "issues": issues}
+
+
+def _run_comic_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback, pages, ids, cuts, block, episode_pages=None) -> dict:
+    """Stage comic-7: compile each still frame into a Type C prompt (deterministic)."""
+    project = _read_json(root / "project.json")
+    plan = _read_json(root / "episodes" / ep / "plan" / "comic-plan.json")
+    bible = _read_json(root / "bible" / "characters.json", {"characters": [], "objects": []})
+    page_total = int(plan.get("page_total", len(plan.get("pages", []))))
+    block = _block_from_pages(pages) if pages else block
+    wanted = list(pages) if pages else block_pages(page_total, block)
+    style = build.negative_style(project)
+    lang = project.get("languages", {}).get("default", "ko")
+    characters = {c["id"]: c for c in bible.get("characters", [])}
+
+    pages_dir = root / "episodes" / ep / "pages"
+    prompts_dir = root / "episodes" / ep / "prompts"
+    files: list[str] = []
+    issues: list[dict] = []
+
+    for n in wanted:
+        scene_path = pages_dir / f"page-{n:03d}.scene.json"
+        if not scene_path.is_file():
+            raise StageError(f"missing comic scene for page {n} — run comic-6 (장면) first")
+        scene = _read_json(scene_path)
+        issues += validate.validate_comic_scene(scene, project)
+        draft = build.compile_single_frame(scene, project, characters, lang)
+        issues += validate.validate_draft(draft, project)
+        prompt_text = build.compile_draft(draft)
+        prompt_obj = json.loads(prompt_text[prompt_text.index("{"):])
+        width, height = draft["width"], draft["height"]
+        issues += validate.validate_prompt(prompt_obj, width, height, project)
+        if not dry:
+            _write_text(prompts_dir / f"page-{n:03d}.prompt.txt", prompt_text + "\n")
+            _write_text(prompts_dir / f"page-{n:03d}.negative.txt", build.negative(style) + "\n")
+        files += [
+            _rel(root, prompts_dir / f"page-{n:03d}.prompt.txt"),
+            _rel(root, prompts_dir / f"page-{n:03d}.negative.txt"),
+        ]
+
+    errs = validate.errors(issues)
+    res = {
+        "note": f"comic prompts {'(dry run) ' if dry else ''}compiled for pages {wanted[0]}..{wanted[-1]}"
+                + ("" if not errs else f" · {len(errs)} error(s)"),
+        "warnings": [i["message"] for i in validate.warnings(issues)],
+        "files": files,
+        "issues": issues,
+    }
+    if dry:
+        res["system"] = "결정적 단계(코드 실행)입니다. AI 프롬프트가 없습니다."
+        res["user"] = f"장면 → 단일 프레임 프롬프트 컴파일\n대상 페이지: {wanted}\n언어: {lang}\n스타일: {style}\n출력: page-NNN.prompt.txt, page-NNN.negative.txt"
+    return res
+
+
 # ================================================================== dispatch
 _RUNNERS = {
     "manga-1-source": _run_source,
@@ -1098,6 +1360,11 @@ _RUNNERS = {
     "manga-7-sheets": _run_sheets,
     "manga-8-artwork": _run_artwork,
     "manga-9-prompts": _run_prompts,
+    # comic (Type C): a sequence of still frames, no cut splitting
+    "comic-1-brief": _run_comic_brief,
+    "comic-5-plan": _run_comic_plan,
+    "comic-6-scene": _run_comic_scene,
+    "comic-7-prompts": _run_comic_prompts,
 }
 
 
@@ -1295,6 +1562,10 @@ def _block_done(root: Path, ep: str, stage_id: str, block: int, page_total: int)
         return all((root / "episodes" / ep / "pages" / f"page-{n:03d}.art.json").is_file() for n in pages)
     if stage_id == "manga-9-prompts":
         return all((root / "episodes" / ep / "prompts" / f"page-{n:03d}.prompt.txt").is_file() for n in pages)
+    if stage_id == "comic-6-scene":
+        return all((root / "episodes" / ep / "pages" / f"page-{n:03d}.scene.json").is_file() for n in pages)
+    if stage_id == "comic-7-prompts":
+        return all((root / "episodes" / ep / "prompts" / f"page-{n:03d}.prompt.txt").is_file() for n in pages)
     return False
 
 
@@ -1322,7 +1593,8 @@ def orchestrate(
     if not episode:
         raise StageError("no episode to run — add one in the wizard")
 
-    for stage in registry.STAGES:
+    mode = project.get("mode", "manga")
+    for stage in registry.STAGES_BY_MODE.get(mode, registry.MANGA_STAGES):
         if not (from_n <= stage.n <= to_n):
             continue
 
@@ -1549,6 +1821,34 @@ def review(slug: str, stage_id: str, *, ep: str | None = None, block: int = 1) -
                    "split": conti.get("split")}
             pages.append(row)
         summary["pages"] = pages
+    elif stage_id == "comic-1-brief" and ep:
+        episode = _read_json(root / "episodes" / ep / "episode.json", {})
+        brief = root / "episodes" / ep / "source" / "brief.md"
+        summary["road"] = episode.get("source_origin")
+        summary["approved"] = (root / "episodes" / ep / "source" / "APPROVED").is_file()
+        summary["chars"] = len(_read_text(brief))
+        summary["excerpt"] = _read_text(brief)[:600]
+    elif stage_id == "comic-5-plan" and ep:
+        plan = _read_json(root / "episodes" / ep / "plan" / "comic-plan.json", None)
+        if plan:
+            issues = validate.validate_comic_plan(plan, project)
+            summary["page_total"] = plan.get("page_total")
+            summary["pages"] = plan.get("pages", [])
+    elif stage_id in ("comic-6-scene", "comic-7-prompts") and ep:
+        plan = _read_json(root / "episodes" / ep / "plan" / "comic-plan.json", {"page_total": 0})
+        page_total = int(plan.get("page_total", 0))
+        rows = []
+        for n in block_pages(page_total, block):
+            scene_path = root / "episodes" / ep / "pages" / f"page-{n:03d}.scene.json"
+            if stage_id == "comic-7-prompts" and not (root / "episodes" / ep / "prompts" / f"page-{n:03d}.prompt.txt").is_file():
+                continue
+            if not scene_path.is_file():
+                continue
+            scene = _read_json(scene_path)
+            if stage_id == "comic-6-scene":
+                issues += validate.validate_comic_scene(scene, project)
+            rows.append({"page": n, "texts": len(scene.get("texts", [])), "scene": scene})
+        summary["pages"] = rows
 
     updated_at = None
     if files:

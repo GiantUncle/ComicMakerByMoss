@@ -80,6 +80,7 @@ export default function StepSettings({
   }, [key]);
 
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  const isComic = project.mode === "comic";   // a comic page is one still frame — no cut fields
 
   const lo = Math.max(1, Math.min(draft.min, 8));
   const hi = Math.max(lo, Math.min(draft.max, 8));
@@ -94,8 +95,8 @@ export default function StepSettings({
         canvas: { tier: draft.tier, ratio: "a4_portrait" },
         reading_direction: draft.reading_direction,
         art_style: draft.art_style,
-        panels: { min: lo, max: hi },
-        detail_panels,
+        panels: isComic ? { min: 1, max: 1 } : { min: lo, max: hi },
+        detail_panels: isComic ? false : detail_panels,
         story_focus: draft.story_focus,
         episode_pages: draft.episode_pages,
       });
@@ -171,6 +172,7 @@ export default function StepSettings({
           </span>
         </div>
 
+        {!isComic && (
         <div className="field" style={{ margin: 0 }}>
           <label>읽기 방향</label>
           <div className="row" style={{ gap: "var(--s-2)", flexWrap: "wrap" }}>
@@ -186,6 +188,7 @@ export default function StepSettings({
             </button>
           </div>
         </div>
+        )}
 
         <div className="field settings-span-2" style={{ margin: 0 }}>
           <label>캔버스 해상도</label>
@@ -234,6 +237,7 @@ export default function StepSettings({
           </select>
         </div>
 
+        {!isComic && (<>
         <div className="field" style={{ margin: 0 }}>
           <label htmlFor="s-cut">컷 배치 방식</label>
           <select id="s-cut" value={draft.cut_mode} onChange={(e) => set({ cut_mode: e.target.value })}>
@@ -284,6 +288,7 @@ export default function StepSettings({
             ))}
           </div>
         </div>
+        </>)}
 
         {error && <div className="settings-span-2"><Note tone="bad">{error}</Note></div>}
         {local && <div className="settings-span-2"><Note tone="bad">{local}</Note></div>}

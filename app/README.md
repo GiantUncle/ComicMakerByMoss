@@ -30,6 +30,26 @@
 **전제·장르·개요** 경로는 `brief.md` 만 저장하고, 1단계가 그 brief 로 산문을 쓴다.
 4~7 단계는 단계 표를 그대로 보여주며, 각 행을 실행하면 산출물과 게이트가 만들어진다.
 
+## 출력 3종 (illustration · comic · manga)
+
+설계는 `docs/design-output-modes.md`. 근거는 `docs/reference-prompts/`의 실제 예제(A/B/C).
+
+- **manga** — 다컷 만화 원고, 9단계. (기존)
+- **comic** — 한 장소에서 이어지는 **정지 프레임**들(twitter식). 페이지마다 한 컷이고
+  **컷 분할이 없다.** 그래서 만화 9단계를 쓰지 않는다 — 프로젝트 설정·캐스트·시트(2·3·4)만
+  공유하고 comic 전용 7단계를 쓴다:
+  `comic-1-brief → … → comic-5-plan → comic-6-scene → comic-7-prompts`.
+  결과는 Type C Layout JSON(`summary.canvas: "single"`). 인물은 만화와 같은 캐스트·시트로
+  고정하고, 페이지마다 인물의 FULL 묘사는 첫 프레임에 한 번만 넣는다.
+  `registry.STAGES_BY_MODE` 가 모드별 단계 목록이다.
+- **illustration** — 프로젝트가 **아니다.** 상단바의 `Illustration` 탭이 여는 즉석 도구다.
+  명령 → Type B 섹션 프롬프트(`<|artist|>… <|style_and_aesthetic|>… <|region|>…`). 결과는
+  **즐겨찾기**(`~/.comicmaker/favorites/`)에 담거나 다음 것을 만들면 버린다.
+  모듈: `app/backend/app/illustration.py`, `favorites.py`,
+  스킬: `.opencode/skills/illustration-prompt/`.
+
+프로젝트 생성 다이얼로그는 이제 **만화 · 컷 만화**만 제시한다(일러스트는 탭).
+
 ## 단계 실행기 · 프로바이더
 
 **OpenCode 없이** 앱이 엔드포인트를 직접 호출한다. `~/.comicmaker/providers.json`

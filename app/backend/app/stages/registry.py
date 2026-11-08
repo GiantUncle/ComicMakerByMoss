@@ -17,7 +17,7 @@ REPO = Path(__file__).resolve().parents[4]
 @dataclass(frozen=True)
 class Stage:
     id: str                    # the skill name, e.g. "manga-3-bible"
-    n: int                     # pipeline number, 1..7
+    n: int                     # pipeline number, 1..9
     scope: str                 # project | episode
     mode: str                  # model | deterministic | present
     produces: tuple[str, ...]  # glob patterns, relative to the project root
@@ -25,29 +25,39 @@ class Stage:
     requires: tuple[str, ...] = ()   # gate files that must already exist
     craft: tuple[str, ...] = ()      # craft docs to attach to the model prompt
     per_block: bool = False          # runs once per 4-page block
+    modes: tuple[str, ...] = ("manga",)   # which output modes the stage belongs to
 
 
-STAGES: tuple[Stage, ...] = (
+# ------------------------------------------------------- shared (manga + comic)
+# A project setting, a cast pool and a reference sheet are mode-independent, so
+# these three stages are literally the same skill and artifact in both modes.
+_STAGE_PROJECT = Stage(
+    id="manga-2-project", n=2, scope="project", mode="present",
+    produces=("project.json",), gate=None, modes=("manga", "comic"),
+)
+_STAGE_BIBLE = Stage(
+    id="manga-3-bible", n=3, scope="project", mode="model",
+    produces=("bible/characters.json",), gate="bible/APPROVED",
+    requires=("episodes/{ep}/source/APPROVED",),
+    craft=("character-consistency.md",), modes=("manga", "comic"),
+)
+_STAGE_SHEETS = Stage(
+    id="manga-4-refsheets", n=4, scope="project", mode="deterministic",
+    produces=("bible/characters/*/sheet.prompt.txt",), gate="bible/SHEETS_APPROVED",
+    requires=("bible/APPROVED",), modes=("manga", "comic"),
+)
+
+# --------------------------------------------------------------- manga (Type A)
+# Multi-panel manuscript pages. Stages 5/7/8/9 are the cut-splitting machinery.
+MANGA_STAGES: tuple[Stage, ...] = (
     Stage(
         id="manga-1-source", n=1, scope="episode", mode="model",
         produces=("episodes/{ep}/episode.json", "episodes/{ep}/source/novel.txt"),
         gate="episodes/{ep}/source/APPROVED",
     ),
-    Stage(
-        id="manga-2-project", n=2, scope="project", mode="present",
-        produces=("project.json",), gate=None,
-    ),
-    Stage(
-        id="manga-3-bible", n=3, scope="project", mode="model",
-        produces=("bible/characters.json",), gate="bible/APPROVED",
-        requires=("episodes/{ep}/source/APPROVED",),
-        craft=("character-consistency.md",),
-    ),
-    Stage(
-        id="manga-4-refsheets", n=4, scope="project", mode="deterministic",
-        produces=("bible/characters/*/sheet.prompt.txt",), gate="bible/SHEETS_APPROVED",
-        requires=("bible/APPROVED",),
-    ),
+    _STAGE_PROJECT,
+    _STAGE_BIBLE,
+    _STAGE_SHEETS,
     Stage(
         id="manga-5-plan", n=5, scope="episode", mode="model",
         produces=("episodes/{ep}/plan/page-story-plan.json",),
@@ -89,8 +99,56 @@ STAGES: tuple[Stage, ...] = (
     ),
 )
 
+# --------------------------------------------------------------- comic (Type C)
+# A sequence of pages, each a single still frame with dialogue. There is no cut
+# splitting: no plan-layout, no cut sheet, no panel artwork, no multi-panel
+# compile. So comic shares only the project/cast/sheets steps with manga.
+_COMIC_BRIEF = Stage(
+    id="comic-1-brief", n=1, scope="episode", mode="model",
+    produces=("episodes/{ep}/episode.json", "episodes/{ep}/source/brief.md"),
+    gate="episodes/{ep}/source/APPROVED", modes=("comic",),
+)
+_COMIC_PLAN = Stage(
+    id="comic-5-plan", n=5, scope="episode", mode="model",
+    produces=("episodes/{ep}/plan/comic-plan.json",),
+    gate="episodes/{ep}/plan/APPROVED",
+    requires=("episodes/{ep}/source/APPROVED", "bible/APPROVED"),
+    craft=("twitter-comic.md",), modes=("comic",),
+)
+_COMIC_SCENE = Stage(
+    id="comic-6-scene", n=6, scope="episode", mode="model", per_block=True,
+    produces=("episodes/{ep}/pages/page-{block}*.scene.json",),
+    gate=None,
+    requires=("episodes/{ep}/plan/APPROVED", "bible/APPROVED"),
+    craft=("twitter-comic.md", "character-consistency.md", "authoring-spec.md"),
+    modes=("comic",),
+)
+_COMIC_PROMPTS = Stage(
+    id="comic-7-prompts", n=7, scope="episode", mode="deterministic", per_block=True,
+    produces=("episodes/{ep}/prompts/page-{block}*.prompt.txt",),
+    gate=None,
+    requires=("episodes/{ep}/plan/APPROVED",), modes=("comic",),
+)
+
+COMIC_STAGES: tuple[Stage, ...] = (
+    _COMIC_BRIEF,
+    _STAGE_PROJECT,
+    _STAGE_BIBLE,
+    _STAGE_SHEETS,
+    _COMIC_PLAN,
+    _COMIC_SCENE,
+    _COMIC_PROMPTS,
+)
+
+STAGES_BY_MODE: dict[str, tuple[Stage, ...]] = {
+    "manga": MANGA_STAGES,
+    "comic": COMIC_STAGES,
+}
+
+# Every stage, for id lookup (STAGES_BY_MODE is what a mode actually runs).
+STAGES: tuple[Stage, ...] = MANGA_STAGES + (_COMIC_BRIEF, _COMIC_PLAN, _COMIC_SCENE, _COMIC_PROMPTS)
 BY_ID = {s.id: s for s in STAGES}
-BY_N = {s.n: s for s in STAGES}
+BY_N = {s.n: s for s in MANGA_STAGES}
 
 
 def render(pattern: str, ep: str | None, block: int | None = None) -> str:
@@ -162,7 +220,8 @@ def _episode_page_files(root: Path, ep: str, kind: str) -> dict[int, Path]:
     d = root / "episodes" / ep / "pages"
     if not d.is_dir():
         return {}
-    ext = {"conti": "conti.json", "sheet": "sheet.json", "art": "art.json"}[kind]
+    ext = {"conti": "conti.json", "sheet": "sheet.json", "art": "art.json",
+           "scene": "scene.json"}[kind]
     return {n: p for p in d.glob(f"page-*.{ext}")
             if (n := _page_no(p)) is not None}
 
@@ -177,6 +236,34 @@ def stale_pages(root: Path, ep: str, stage_id: str, block: int | None = None) ->
       manga-9-prompts  : plan|conti|sheet|art > prompt
     Empty when the stage has no such dependency or the page has no output yet.
     """
+    if stage_id in ("comic-6-scene", "comic-7-prompts"):
+        # comic chain: comic-plan > scene > prompt
+        plan_m = _mtime(root / "episodes" / ep / "plan" / "comic-plan.json")
+        scenes = _episode_page_files(root, ep, "scene")
+        prompts = _episode_page_files(root, ep, "prompt")
+
+        def c_in_block(n: int) -> bool:
+            return block is None or ((n - 1) // 4 + 1) == block
+
+        def c_older(out_m: float | None, ups: list[float | None]) -> bool:
+            if out_m is None:
+                return False
+            return any(u is not None and u > out_m for u in ups)
+
+        out: list[int] = []
+        if stage_id == "comic-6-scene":
+            for n, p in sorted(scenes.items()):
+                if c_in_block(n) and c_older(_mtime(p), [plan_m]):
+                    out.append(n)
+        else:
+            for n, p in sorted(prompts.items()):
+                if not c_in_block(n):
+                    continue
+                up = [plan_m, _mtime(scenes[n]) if n in scenes else None]
+                if c_older(_mtime(p), up):
+                    out.append(n)
+        return out
+
     if stage_id not in ("manga-6-conti", "manga-7-sheets", "manga-8-artwork", "manga-9-prompts"):
         return []
     plan_m = _mtime(root / "episodes" / ep / "plan" / "page-story-plan.json")
@@ -254,22 +341,14 @@ class StageStatus:
 def status_for(root: Path, project: dict, ep: str | None, episode: dict | None) -> list[StageStatus]:
     """State of every stage for a project, and for one episode when given."""
     mode = project.get("mode", "manga")
+    stages = STAGES_BY_MODE.get(mode, MANGA_STAGES)
     out: list[StageStatus] = []
 
-    for stage in STAGES:
+    for stage in stages:
         # episode-scope stages need an episode
         if stage.scope == "episode" and not ep:
             out.append(StageStatus(stage.id, stage.n, stage.scope, stage.mode,
                                    "unavailable", "에피소드를 먼저 선택하세요", stage.gate))
-            continue
-        # illustration ends after stage 4; comic after stage 5
-        if mode == "illustration" and stage.n > 4:
-            out.append(StageStatus(stage.id, stage.n, stage.scope, stage.mode,
-                                   "unavailable", "illustration 은 4단계에서 끝납니다", stage.gate))
-            continue
-        if mode == "comic" and stage.n >= 6:
-            out.append(StageStatus(stage.id, stage.n, stage.scope, stage.mode,
-                                   "unavailable", "comic 은 5단계에서 끝납니다", stage.gate))
             continue
 
         done = is_done(root, stage, ep)

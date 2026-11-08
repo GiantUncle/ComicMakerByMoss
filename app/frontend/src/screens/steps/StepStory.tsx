@@ -57,6 +57,8 @@ export default function StepStory({
   const episodes = project?.episodes ?? [];
   const current = ep ?? episodes[episodes.length - 1]?.id ?? null;
   const busyAll = busy || busyLocal;
+  const isComic = project?.mode === "comic";
+  const briefStage = isComic ? "comic-1-brief" : "manga-1-source";
 
   useEffect(() => {
     if (!current) {
@@ -110,7 +112,7 @@ export default function StepStory({
     setLocalNote(null);
     try {
       await api.saveEpisodeSource(slug, current, { text, mode: "brief", origin: "premise" });
-      const r = await api.runStage({ slug, stage: "manga-1-source", episode: current });
+      const r = await api.runStage({ slug, stage: briefStage, episode: current });
       if ((r as any).dry) {
         setLocalNote("프롬프트 확인만 했습니다.");
       } else {
@@ -180,7 +182,7 @@ export default function StepStory({
     <div className="stack" style={{ gap: "var(--s-4)" }}>
       <div className="actionbar">
         <div className="actionbar-state">
-          <strong style={{ fontSize: "var(--text-lg)" }}>스토리</strong>
+          <strong style={{ fontSize: "var(--text-lg)" }}>{isComic ? "브리프" : "스토리"}</strong>
           <span className="chip">에피소드 {current}</span>
           {approved ? <span className="chip chip--ok">저장됨</span> : <span className="chip chip--warn">미저장</span>}
           {sourceKind === "brief" && <span className="chip">아이디어</span>}
@@ -205,7 +207,7 @@ export default function StepStory({
             저장
           </button>
           <button type="button" className="btn btn--primary" onClick={generateNovel} disabled={busyAll || !current || !text.trim()}>
-            {busyAll ? "생성 중…" : "AI로 소설 생성"}
+            {busyAll ? "생성 중…" : isComic ? "AI로 브리프 생성" : "AI로 소설 생성"}
           </button>
         </div>
       </div>

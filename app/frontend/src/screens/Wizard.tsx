@@ -129,6 +129,7 @@ export default function Wizard({
     if (next !== cur) window.history.replaceState(null, "", next);
   }, [slug, step, ep, tab, page, block, tier]);
 
+  const mode = project?.mode ?? "manga";
   const episode = episodeSummary(project, ep);
   const pageTotal = episode?.page_total ?? null;
   const pages = Math.max(1, pageTotal ?? 1);
@@ -174,7 +175,7 @@ export default function Wizard({
     }
   }
 
-  const meta = stepMeta(step);
+  const meta = stepMeta(step, mode);
   const headState: { text: string; cls: string } | null = (() => {
     if (!slug || !project) return { text: "현재 결과 없음", cls: "" };
     const stageId = meta?.stages?.[0];
@@ -227,7 +228,7 @@ export default function Wizard({
             {headState && <span className={"chip " + headState.cls}>{headState.text}</span>}
             {step > 1 && (
               <button className="btn" onClick={() => onStep(step - 1)} style={{ marginLeft: "auto" }}>
-                ← {stepMeta(step - 1)?.label}
+                ← {stepMeta(step - 1, mode)?.label}
               </button>
             )}
           </div>
@@ -272,13 +273,17 @@ export default function Wizard({
         />
       )}
 
-      {slug && project && (step === 3 || step === 4) && renderStage(stepMeta(step)!.stages[0])}
+      {slug && project && (step === 3 || step === 4) && renderStage(stepMeta(step, mode)!.stages[0])}
 
-      {slug && project && step === 5 && renderStage("manga-5-plan", { onPickCut: (p) => setPage(p) })}
+      {slug && project && step === 5 && (mode === "comic"
+        ? renderStage("comic-5-plan")
+        : renderStage("manga-5-plan", { onPickCut: (p) => setPage(p) }))}
 
-      {slug && project && step === 6 && renderStage("manga-6-conti")}
+      {slug && project && step === 6 && renderStage(mode === "comic" ? "comic-6-scene" : "manga-6-conti")}
 
-      {slug && project && step === 7 && (
+      {slug && project && step === 7 && mode === "comic" && renderStage("comic-7-prompts")}
+
+      {slug && project && step === 7 && mode !== "comic" && (
         <div className="stack" style={{ gap: "var(--s-4)" }}>
           <div className="tabs" role="tablist" aria-label="프롬프트 단계">
             {(

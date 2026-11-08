@@ -22,7 +22,7 @@ PROJECTS = Path(os.environ.get("CM_PROJECTS", REPO / "projects"))
 
 SLUG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 TIERS = ("S", "M", "L", "XL")
-MODES = ("illustration", "comic", "manga")
+MODES = ("manga", "comic")   # illustration is a top-level tool, not a project (see docs/design-output-modes.md)
 ROUTES = ("provided", "premise", "genre", "outline")
 # how the dominant panel of a page is spent — a strategy the agent applies, not a rule
 FOCUS = ("character", "narrative", "balanced")
@@ -177,13 +177,19 @@ def create_project(body: NewProject) -> dict:
     root.mkdir(parents=True, exist_ok=True)
 
     panels = body.panels.model_dump()
-    if not body.detail_panels:
+    if body.mode == "comic":
+        # a comic page is one still frame — no cut range at all
+        panels = {"min": 1, "max": 1}
+    elif not body.detail_panels:
         # a page of five or more panels means small, detailed cuts the model
         # handles poorly, so the default keeps every page at four or fewer
         panels["max"] = min(panels["max"], 4)
         panels["min"] = min(panels["min"], panels["max"])
 
-    episode_pages = _norm_episode_pages(getattr(body, "episode_pages", 12))
+    raw_pages = getattr(body, "episode_pages", 12)
+    if body.mode == "comic" and raw_pages in (None, 12):
+        raw_pages = 4   # a short twitter comic defaults to four frames
+    episode_pages = _norm_episode_pages(raw_pages)
     project = {
         "slug": body.slug,
         "mode": body.mode,
@@ -296,8 +302,10 @@ def create_episode(slug: str, body: NewEpisode) -> dict:
         src = ep_root / "source"
         src.mkdir(parents=True, exist_ok=True)
         if body.source_origin == "provided":
-            # the user's own prose is the source, verbatim
-            (src / "novel.txt").write_text(body.story, encoding="utf-8")
+            # the user's own text is the source, verbatim — prose for manga, a
+            # short brief for a comic
+            name = "brief.md" if project.get("mode") == "comic" else "novel.txt"
+            (src / name).write_text(body.story, encoding="utf-8")
             (src / "APPROVED").write_text(
                 f"provided · {_today()}\n", encoding="utf-8"
             )
@@ -389,8 +397,10 @@ def put_source(slug: str, ep: str, body: SourceIn) -> dict:
         episode = _read(ej)
         episode["source_origin"] = origin
         _write(ej, episode)
-        novel.write_text(text, encoding="utf-8")
+        mode = _read(_require_slug(slug) / "project.json").get("mode", "manga")
+        target, other = (brief, novel) if mode == "comic" else (novel, brief)
+        target.write_text(text, encoding="utf-8")
         approved.write_text(f"{origin} · {_today()}\n", encoding="utf-8")
-        if brief.exists():
-            brief.unlink()
+        if other.exists():
+            other.unlink()
         return {"ok": True, "mode": "provided", "origin": origin}

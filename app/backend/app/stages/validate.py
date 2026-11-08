@@ -434,6 +434,15 @@ def validate_artwork(art: dict, conti: dict) -> list[dict]:
         out.append(issue("error", "art.panel-missing", where, f"no caption for panel {n}"))
 
     want_texts = {str(t.get("id")) for t in conti.get("texts", [])}
+    lines_of: dict[str, list[str]] = {}
+    for t in conti.get("texts", []):
+        body = (t.get("lines") or {})
+        lines_of[str(t.get("id"))] = [
+            str(v).strip()
+            for lang in ("ko", "en", "ja")
+            for v in (body.get(lang) or [])
+            if str(v).strip()
+        ]
     seen_texts: set[str] = set()
     for i, t in enumerate(art.get("texts", [])):
         tw = f"{where}/texts[{i}]"
@@ -443,6 +452,10 @@ def validate_artwork(art: dict, conti: dict) -> list[dict]:
             out.append(issue("error", "art.empty-caption", tw, f"caption for text {tid!r} is empty"))
             continue
         seen_texts.add(tid)
+        # the caption describes the box; the words themselves live in the conti
+        if any(line and line in caption for line in lines_of.get(tid, [])):
+            out.append(issue("warning", "art.text-restates-words", tw,
+                             "caption restates the lettering — describe the box, the words stay in the conti"))
         if want_texts and tid not in want_texts:
             out.append(issue("warning", "art.extra-text", tw,
                              f"text {tid!r} is not in the conti"))
@@ -518,6 +531,142 @@ def validate_plan(plan: dict, project: dict) -> list[dict]:
 
 
 # -------------------------------------------------------------------- bible
+# ---------------------------------------------------------------- illustration
+# Type B (docs/reference-prompts/B-*): a sectioned prose prompt. No JSON, no
+# boxes. The trigger line comes first; then one style section and one section
+# per region. Anything else is not a Type B prompt.
+SECTION_NAME = re.compile(r"^[A-Za-z0-9_]+$")
+
+
+def validate_sections(draft: dict, project: dict | None = None) -> list[dict]:
+    """A Type B draft: trigger + style_and_aesthetic + one or more regions."""
+    out: list[dict] = []
+    style = str(draft.get("style_and_aesthetic", "")).strip()
+    if not style:
+        out.append(issue("error", "sections.no-style", "style_and_aesthetic",
+                         "the style_and_aesthetic section is empty"))
+    sections = draft.get("sections")
+    if not isinstance(sections, list) or not sections:
+        out.append(issue("error", "sections.empty", "sections",
+                         "at least one region section is required"))
+        return out
+    seen: set[str] = set()
+    for i, s in enumerate(sections):
+        where = f"sections[{i}]"
+        if not isinstance(s, dict):
+            out.append(issue("error", "sections.not-object", where, "section must be an object"))
+            continue
+        name = str(s.get("name", "")).strip()
+        if not name or not SECTION_NAME.match(name):
+            out.append(issue("error", "sections.bad-name", where,
+                             f"section name {name!r} must be one tight token (A-Za-z0-9_)"))
+        elif name == "style_and_aesthetic":
+            out.append(issue("error", "sections.dup-style", where,
+                             "style_and_aesthetic is its own section — do not repeat it"))
+        elif name in seen:
+            out.append(issue("error", "sections.dup-name", where, f"duplicate section {name!r}"))
+        else:
+            seen.add(name)
+        if not str(s.get("caption", "")).strip():
+            out.append(issue("error", "sections.no-caption", where, "section caption is empty"))
+    return out
+
+
+# ----------------------------------------------------------------------- comic
+def validate_comic_plan(plan: dict, project: dict | None = None) -> list[dict]:
+    """A comic plan: pages are static moments, not panels. No cut/template fields."""
+    out: list[dict] = []
+    total = plan.get("page_total")
+    if not isinstance(total, int) or total <= 0:
+        return [issue("error", "comic-plan.no-page-total", "plan",
+                      "page_total must be a positive integer")]
+    if total % 4:
+        out.append(issue("error", "comic-plan.not-multiple-of-4", "plan",
+                         f"page_total {total} is not a multiple of 4"))
+    pages = plan.get("pages")
+    if not isinstance(pages, list) or not pages:
+        return out + [issue("error", "comic-plan.no-pages", "plan", "pages must be a nonempty array")]
+    if len(pages) != total:
+        out.append(issue("error", "comic-plan.page-count", "plan",
+                         f"{len(pages)} pages listed but page_total is {total}"))
+    for i, page in enumerate(pages):
+        pw = f"page {page.get('page', i + 1)}"
+        if not str(page.get("moment", "")).strip():
+            out.append(issue("error", "comic-plan.no-moment", pw, "moment (the still) is empty"))
+        if int(page.get("page", 0)) >= 2 and not str(page.get("change", "")).strip():
+            out.append(issue("error", "comic-plan.no-change", pw,
+                             "page 2 onward says what changes from the previous frame"))
+        # a comic page is one frame: the panel machinery must not leak in
+        for forbidden in ("template_suggestion", "panel_target", "split", "focus"):
+            if forbidden in page:
+                out.append(issue("error", "comic-plan.forbidden-field", pw,
+                                 f"{forbidden!r} is a manga cut field — a comic page is a single frame"))
+    return out
+
+
+def validate_comic_scene(scene: dict, project: dict | None = None) -> list[dict]:
+    """A comic scene: one still frame plus its lettering. No panels, no layout."""
+    out: list[dict] = []
+    page = scene.get("page", "?")
+    where = f"page {page}"
+    if not str(scene.get("scene", "")).strip():
+        out.append(issue("error", "comic-scene.no-scene", where,
+                         "scene is empty — describe the whole frame"))
+    if not str(scene.get("style", "")).strip():
+        out.append(issue("warning", "comic-scene.no-style", where,
+                         "no per-page style line — the summary will carry the project style"))
+
+    tier = project.get("canvas", {}).get("tier", "M") if project else "M"
+    size = _tier_size(tier)
+
+    box = scene.get("frame_bbox")
+    if box is not None:
+        err = _check_bbox(box, *size) if size else None
+        if err:
+            out.append(issue("error", "comic-scene.frame-off-canvas", where,
+                             f"frame_bbox: {err}"))
+
+    texts = scene.get("texts", [])
+    if not isinstance(texts, list):
+        out.append(issue("error", "comic-scene.texts", where, "texts must be an array"))
+        return out
+    seen_ids: set = set()
+    for i, text in enumerate(texts):
+        tw = f"{where}/texts[{i}]"
+        tid = text.get("id")
+        if tid in seen_ids:
+            out.append(issue("error", "comic-scene.dup-text-id", tw, f"duplicate text id {tid!r}"))
+        seen_ids.add(tid)
+        if text.get("kind") not in KINDS:
+            out.append(issue("error", "comic-scene.bad-kind", tw,
+                             f"kind {text.get('kind')!r} is not one of {KINDS}"))
+        if text.get("bubble") not in BUBBLES:
+            out.append(issue("error", "comic-scene.bad-bubble", tw,
+                             f"bubble {text.get('bubble')!r} is not one of {BUBBLES}"))
+        lines = text.get("lines") or {}
+        lengths = {}
+        for lang in ("ko", "en", "ja"):
+            value = lines.get(lang)
+            if not isinstance(value, list) or not value:
+                out.append(issue("error", "comic-scene.missing-lang", tw, f"lines.{lang} is missing"))
+                lengths[lang] = 0
+            else:
+                lengths[lang] = len(value)
+        served = {v for v in lengths.values() if v}
+        if len(served) > 1:
+            out.append(issue("error", "comic-scene.line-count", tw,
+                             f"line counts differ across languages {lengths}"))
+        box = text.get("bbox")
+        if box is None:
+            out.append(issue("warning", "comic-scene.no-text-box", tw,
+                             "no bbox — the build will place this line in the frame"))
+        elif size is not None:
+            err = _check_bbox(box, size[0], size[1])
+            if err:
+                out.append(issue("error", "comic-scene.text-box-off-canvas", tw, err))
+    return out
+
+
 def validate_bible(pool: dict, cast: list[str] | None = None) -> list[dict]:
     out: list[dict] = []
     ids = set()

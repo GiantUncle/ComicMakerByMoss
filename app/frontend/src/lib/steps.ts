@@ -26,7 +26,7 @@ export interface StepMeta {
   needs?: string;
 }
 
-export const STEPS: StepMeta[] = [
+export const MANGA_STEPS: StepMeta[] = [
   {
     n: 1,
     label: "스토리",
@@ -85,10 +85,78 @@ export const STEPS: StepMeta[] = [
   },
 ];
 
-export const STEP_BY_N = new Map(STEPS.map((s) => [s.n, s]));
+/**
+ * comic — a sequence of still frames. It shares the project · cast · sheets
+ * steps with manga (2·3·4) but has no cut splitting: its own brief, moment plan,
+ * scene and Type C prompt. See docs/design-output-modes.md.
+ */
+export const COMIC_STEPS: StepMeta[] = [
+  {
+    n: 1,
+    label: "브리프",
+    scope: "episode",
+    blurb:
+      "이 만화의 짧은 순간 이야기를 정하는 단계입니다. 한 장소에서 이어지는 몇 개의 순간을 붙여넣거나, 전제만 주면 AI가 짧은 브리프로 씁니다.",
+    stages: ["comic-1-brief"],
+  },
+  {
+    n: 2,
+    label: "프로젝트 설정",
+    scope: "project",
+    blurb:
+      "제목 · 해상도 · 화풍을 정합니다. 컷 만화는 페이지마다 정지 프레임 한 컷이라 컷 수 범위는 없습니다.",
+    stages: [],
+  },
+  {
+    n: 3,
+    label: "캐스트",
+    scope: "project",
+    blurb:
+      "등장인물 카드 풀을 만드는 단계입니다. 만화와 같은 방식으로 외형을 한 번만 정해두면 모든 페이지가 같은 인물로 그려집니다.",
+    stages: ["manga-3-bible"],
+  },
+  {
+    n: 4,
+    label: "레퍼런스 시트",
+    scope: "project",
+    blurb:
+      "인물마다 기준 시트 문장을 만드는 단계입니다. 만화와 같은 방식입니다.",
+    stages: ["manga-4-refsheets"],
+  },
+  {
+    n: 5,
+    label: "순간 계획",
+    scope: "episode",
+    blurb:
+      "브리프를 정지 프레임(순간)들로 나누는 단계입니다. 프레임마다 무엇을 보여주고 이전 프레임에서 무엇이 달라지는지, 무슨 말이 오가는지를 정합니다. 컷 분할은 없습니다.",
+    stages: ["comic-5-plan"],
+  },
+  {
+    n: 6,
+    label: "장면",
+    scope: "episode",
+    blurb:
+      "프레임마다 그림을 글로 그리고 대사·내레이션을 3개국어로 씁니다. 이어서 프롬프트가 컴파일됩니다.",
+    stages: ["comic-6-scene", "comic-7-prompts"],
+  },
+  {
+    n: 7,
+    label: "프롬프트",
+    scope: "episode",
+    blurb:
+      "장면을 MOSS-Image가 바로 읽는 Type C 프롬프트(prompt.txt · negative.txt)로 내보냅니다. 한 페이지 = 한 정지 프레임(canvas: single).",
+    stages: ["comic-7-prompts"],
+  },
+];
 
-export function stepMeta(n: number): StepMeta | undefined {
-  return STEP_BY_N.get(n);
+export const STEPS = MANGA_STEPS;   // default / back-compat
+
+export function stepsFor(mode?: string | null): StepMeta[] {
+  return mode === "comic" ? COMIC_STEPS : MANGA_STEPS;
+}
+
+export function stepMeta(n: number, mode?: string | null): StepMeta | undefined {
+  return stepsFor(mode).find((s) => s.n === n);
 }
 
 export const SCOPE_LABEL: Record<Scope, string> = {

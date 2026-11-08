@@ -288,6 +288,14 @@ export default function StageReview({
             <ArtworkMade rows={rows} block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
           ) : stage === "manga-9-prompts" ? (
             <BlockMade rows={rows} label="프롬프트" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
+          ) : stage === "comic-1-brief" ? (
+            <SourceMade review={review} />
+          ) : stage === "comic-5-plan" ? (
+            <ComicPlanMade rows={rows} block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
+          ) : stage === "comic-6-scene" ? (
+            <SceneMade rows={rows} block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
+          ) : stage === "comic-7-prompts" ? (
+            <BlockMade rows={rows} label="프롬프트" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
           ) : (
             <BlockMade rows={rows} label="현재 결과" block={block} selectedPages={selectedPages} onTogglePage={onTogglePage} />
           )}
@@ -905,6 +913,136 @@ function BlockMade({
       <p className="muted" style={{ fontSize: "var(--text-sm)", margin: 0 }}>
         글자 = 말풍선 · 내레이션 · 효과음 · 이름표. 원고 미리보기에서 종류별로 눌러 볼 수 있습니다.
       </p>
+    </div>
+  );
+}
+
+/** comic-5-plan — the sequence of still moments (no panels, no layouts). */
+function ComicPlanMade({
+  rows,
+  block,
+  selectedPages,
+  onTogglePage,
+}: {
+  rows: PageRow[];
+  block: number;
+  selectedPages?: number[];
+  onTogglePage?: (page: number) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        title={`이 블록(${(block - 1) * 4 + 1}–${block * 4}p)에 아직 계획이 없습니다.`}
+        hint="실행 버튼을 누르면 브리프가 정지 프레임(순간)들로 나뉩니다."
+      />
+    );
+  }
+  return (
+    <div className="stack-tight">
+      <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
+        한 페이지 = 한 프레임(정지 장면). 컷 분할은 없습니다 — 프레임마다 ‘무엇이 달라지는지’가 흐름입니다.
+      </span>
+      <div className="rows">
+        {rows.map((r: any) => (
+          <article
+            key={r.page}
+            className="card"
+            onClick={onTogglePage ? () => onTogglePage(r.page) : undefined}
+            style={{
+              padding: "var(--s-3)",
+              cursor: onTogglePage ? "pointer" : undefined,
+              outline: onTogglePage && selectedPages?.includes(r.page) ? "2px solid var(--primary)" : undefined,
+              outlineOffset: 1,
+            }}
+          >
+            <div className="row" style={{ gap: "var(--s-2)", alignItems: "center", flexWrap: "wrap" }}>
+              <span className="plan-card-page mono">{r.page}p</span>
+              {r.place && <span className="chip mono">{r.place}</span>}
+            </div>
+            {r.moment && <p style={{ margin: "var(--s-2) 0 0", fontSize: "var(--text-sm)" }}><strong>순간:</strong> {r.moment}</p>}
+            {r.change && <p style={{ margin: "var(--s-1) 0 0", fontSize: "var(--text-sm)" }}><strong>변화:</strong> {r.change}</p>}
+            {r.dialogue_intent && <p style={{ margin: "var(--s-1) 0 0", fontSize: "var(--text-sm)" }} className="muted"><strong>대사 의도:</strong> {r.dialogue_intent}</p>}
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** comic-6-scene — each page's still frame and its lettering. */
+function SceneMade({
+  rows,
+  block,
+  selectedPages,
+  onTogglePage,
+}: {
+  rows: PageRow[];
+  block: number;
+  selectedPages?: number[];
+  onTogglePage?: (page: number) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        title={`이 블록(${(block - 1) * 4 + 1}–${block * 4}p)에 아직 장면이 없습니다.`}
+        hint="실행 버튼을 누르면 각 프레임을 글로 그리고 대사를 씁니다."
+      />
+    );
+  }
+  return (
+    <div className="stack-tight">
+      <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
+        장면 — 프레임마다의 그림과 대사(3개국어). 이어서 프롬프트가 컴파일됩니다.
+      </span>
+      {rows.map((r: any) => {
+        const sc = r.scene ?? {};
+        const texts: any[] = Array.isArray(sc.texts) ? sc.texts : [];
+        return (
+          <article
+            key={r.page}
+            className="card"
+            onClick={onTogglePage ? () => onTogglePage(r.page) : undefined}
+            style={{
+              padding: "var(--s-3)",
+              cursor: onTogglePage ? "pointer" : undefined,
+              outline: onTogglePage && selectedPages?.includes(r.page) ? "2px solid var(--primary)" : undefined,
+              outlineOffset: 1,
+            }}
+          >
+            <div className="row" style={{ gap: "var(--s-2)", alignItems: "center", flexWrap: "wrap" }}>
+              <span className="plan-card-page mono">{r.page}p</span>
+              <span className="chip">텍스트 {texts.length}</span>
+              {sc.anchor_of && <span className="chip">앵커: {sc.anchor_of}</span>}
+              {sc.label && <span className="chip mono">{sc.label}</span>}
+            </div>
+            {sc.scene && (
+              <div style={{ marginTop: "var(--s-2)" }}>
+                <div className="muted" style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: 4 }}>프레임 (그림)</div>
+                <pre className="rules-pre" style={{ whiteSpace: "pre-wrap", margin: 0 }}>{sc.scene}</pre>
+              </div>
+            )}
+            {sc.style && <p className="muted" style={{ margin: "var(--s-2) 0 0", fontSize: "var(--text-sm)" }}><strong>스타일:</strong> {sc.style}</p>}
+            {texts.length > 0 && (
+              <div className="rows" style={{ marginTop: "var(--s-2)" }}>
+                {texts.map((tx: any) => (
+                  <div key={tx.id || Math.random()} className="card" style={{ padding: "8px 10px", fontSize: "var(--text-sm)" }}>
+                    <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+                      <span className="chip">{KIND_KO[tx.kind] ?? tx.kind ?? "텍스트"}</span>
+                      {tx.speaker && <span className="chip">{tx.speaker}</span>}
+                      {tx.id && <span className="mono muted" style={{ fontSize: 11 }}>{tx.id}</span>}
+                    </div>
+                    {["ko", "en", "ja"].map((l) =>
+                      Array.isArray(tx.lines?.[l]) ? (
+                        <div key={l}><span className="muted">{l.toUpperCase()}</span> {tx.lines[l].join(" / ")}</div>
+                      ) : null
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </article>
+        );
+      })}
     </div>
   );
 }

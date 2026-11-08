@@ -61,6 +61,16 @@ coordinates, and you never state them. You decide what is *drawn inside* them.
    text itself stays in the conti — you describe the box and how it is lettered,
    never restate the words.
 
+   ```
+   wrong: Small Korean SFX "탁" drawn on the table beside the button.
+   right: Small bold Korean sound-effect lettering on the art at the source of
+          the sound, white halo, no balloon.
+   ```
+
+   If a dialogue line or an SFX glyph appears in what you wrote, delete it. The
+   caption says what the box *is*; the words are already in the conti and are
+   read from there.
+
 5. Return one object:
 
 ```jsonc
@@ -91,6 +101,8 @@ coordinates, and you never state them. You decide what is *drawn inside* them.
 - A caption answers: what, what shape, what light, what expression
   (`comic-planning.md` §7).
 - Do not restate the conti's `beat` verbatim. Rewrite it as what is seen.
+- No lettering caption carries the words. Not a dialogue line, not an SFX
+  glyph — the box is described, the text is not repeated.
 
 ## Done when
 

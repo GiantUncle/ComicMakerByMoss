@@ -379,6 +379,9 @@ def build_page(
             "label": "character" if anchor else "object",
             "caption": caption,
             "bbox": list(lp["bbox"]),
+            # wiring key for stage 8: which conti panel this box is. `note` is
+            # dropped at compile time, so it never reaches the prompt.
+            "note": f"panel-{int(cp.get('n', len(items) + 1))}",
         }
         if tags:
             item["tags"] = tags
@@ -479,6 +482,143 @@ def compile_draft(draft: dict[str, Any]) -> str:
     if normalized.get("prefix"):
         payload = normalized["prefix"] + "\n" + payload
     return payload
+
+
+def compile_sections(draft: dict[str, Any]) -> str:
+    """A Type B draft -> a sectioned prompt (docs/reference-prompts/B-*).
+
+    The trigger line is first, followed by a **literal** `\\n` (the reference
+    samples use the two characters, not a newline). Then the style section, then
+    one section per region. No JSON, no boxes.
+    """
+    artist = str(draft.get("artist") or "fkey").strip()
+    style = str(draft.get("style_and_aesthetic", "")).strip()
+    parts = [f"<|artist|>{artist}<|/artist|>\\n"]
+    parts.append(f"<|style_and_aesthetic|>{style}<|/style_and_aesthetic|>")
+    for s in draft.get("sections", []):
+        name = str(s.get("name", "")).strip()
+        cap = str(s.get("caption", "")).strip()
+        if not name:
+            continue
+        parts.append(f"<|{name}|>{cap}<|/{name}|>")
+    return "\n".join(parts)
+
+
+def _frame_bbox(width: int, height: int, box: Any = None) -> list[int]:
+    """The single-frame item's box — the model's, or most of the canvas."""
+    if isinstance(box, list) and len(box) == 4:
+        return [round(v) for v in box]
+    mx, my = width * 0.04, height * 0.04
+    return [round(mx), round(my), round(width - mx), round(height - my)]
+
+
+def _default_text_box(body: str, vertical: bool, width: int, height: int, slot: int) -> list[int]:
+    """A safe box for a line the scene did not place."""
+    cl = script("compile_layout.py")
+    font = max(11.0, height / 70)
+    need_w, need_h = cl.required_box(body, vertical, font)
+    pad = font * 0.6
+    w = min(need_w + pad * 2, width * 0.6)
+    h = min(need_h + pad * 2, height * 0.3)
+    x1 = width * 0.06 + (slot % 2) * width * 0.28
+    y1 = height * 0.06 + (slot // 2) * h
+    x1 = min(x1, width - w - 8)
+    y1 = min(y1, height - h - 8)
+    return [round(x1), round(y1), round(x1 + w), round(y1 + h)]
+
+
+def compile_single_frame(
+    scene: dict[str, Any],
+    project: dict[str, Any],
+    characters: dict[str, dict],
+    lang: str,
+    tier_override: str | None = None,
+) -> dict[str, Any]:
+    """A comic scene -> a Type C draft: one still frame plus its lettering.
+
+    A comic page is a single frame (`summary.canvas: "single"`), so there are no
+    panel boxes to instantiate — the frame is the whole picture and the scene
+    describes what is drawn inside it. Text boxes come from the scene, or are
+    placed safely inside the frame.
+
+    **Identity is described, never labelled.** A figure's FULL description appears
+    exactly once per page (`reference-prompts/README.md` R-A), and a comic page
+    is one frame — so that frame always carries the character's full `descriptor`.
+    The `summary.caption` also carries the cast total (`authoring-spec.md` §10.6.7,
+    §10.7). A bare `identifier_label` or `ref_id` never stands in for a person.
+    """
+    tier = tier_override or project.get("canvas", {}).get("tier", "M")
+    width, height = tier_size(tier)
+
+    style = str(scene.get("style", "")).strip()
+    texts = scene.get("texts", []) or []
+
+    present: list[str] = []
+    for t in texts:
+        sp = t.get("speaker")
+        if sp and sp not in present:
+            present.append(sp)
+    anchor = scene.get("anchor_of")
+    if not anchor and len(present) == 1:
+        anchor = present[0]
+    if anchor and anchor not in present:
+        present.insert(0, anchor)
+    index_prose = cast_index_prose(present, characters)
+    caption = style if not index_prose else f"{style}\n{index_prose}"
+
+    frame_cap = str(scene.get("scene", "")).strip()
+    card = characters.get(anchor) if anchor else None
+    if card and card.get("descriptor"):
+        # R-A: on each page a figure's FULL description appears exactly once. A
+        # comic page is one frame, so that frame always carries it — the figure
+        # is described, never labelled.
+        frame_cap = f"{frame_cap} {card['descriptor']}".strip()
+    # the anchored subject is a person, so give the model a `character` — the
+    # scene may carry its own label, but an anchor always means a figure
+    label = "character" if anchor else (scene.get("label") or "object")
+
+    frame_item: dict[str, Any] = {
+        "label": label,
+        "caption": frame_cap,
+        "bbox": _frame_bbox(width, height, scene.get("frame_bbox")),
+    }
+    if anchor:
+        frame_item["ref_id"] = anchor
+    items: list[dict[str, Any]] = [frame_item]
+
+    for t in sorted(texts, key=lambda e: e.get("id", "")):
+        body = join_lines(t, lang)
+        if not body.strip():
+            continue
+        vertical = bool(t.get("vertical"))
+        bbox = t.get("bbox")
+        if not (isinstance(bbox, list) and len(bbox) == 4):
+            bbox = _default_text_box(body, vertical, width, height, len(items))
+        items.append({
+            "label": "text",
+            "caption": text_caption(
+                t.get("kind", "dialogue"), t.get("bubble", "round"), vertical, t.get("tail"),
+            ),
+            "text": body,
+            "bbox": [round(v) for v in bbox],
+            "ref_id": t.get("id"),
+        })
+
+    draft: dict[str, Any] = {
+        "width": width,
+        "height": height,
+        "bbox_coord_space": "abs",
+        "bbox_format": "xyxy",
+        "summary": {
+            "meta": ["comic", "single", "digital_painting"],
+            "canvas": "single",
+            "caption": caption.strip(),
+        },
+        "items": items,
+    }
+    if str(project.get("art_style", "")).startswith("fkey"):
+        draft["prefix"] = FKEY_PREFIX
+    return draft
 
 
 def check_draft(draft: dict[str, Any]) -> list[str]:

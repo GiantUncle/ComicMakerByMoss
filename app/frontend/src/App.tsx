@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { api, type Lang, type ProjectSummary, type StageStatus } from "./api";
 import { applyTheme, loadTheme, THEMES, type Theme } from "./theme";
-import { STEPS, stepMeta, stageState } from "./lib/steps";
+import { stepsFor, stepMeta, stageState } from "./lib/steps";
 import { openEpisodeId } from "./lib/project";
 import ModelMenu from "./components/ModelMenu";
 import Projects from "./screens/Projects";
 import Providers from "./screens/Providers";
+import Illustration from "./screens/Illustration";
 import Wizard from "./screens/Wizard";
 
 /**
@@ -145,6 +146,14 @@ export default function App() {
               <span aria-hidden>💾</span> {saved}
             </span>
           )}
+          <button
+            className="btn"
+            aria-current={step === -2 ? "true" : undefined}
+            onClick={() => setStep(-2)}
+            title="프로젝트 없이 일러스트 프롬프트를 즉석에서 만듭니다"
+          >
+            <span aria-hidden>🖼️</span> Illustration
+          </button>
           <button className="btn" onClick={cycleTheme} title="누르면 테마가 바뀝니다" aria-label="테마 전환">
             <span aria-hidden>{THEMES.find((t) => t.id === theme)?.icon ?? "🎨"}</span>
             {THEMES.find((t) => t.id === theme)?.label ?? theme}
@@ -168,6 +177,7 @@ export default function App() {
 
         <main className="main">
           {step === -1 && <Providers />}
+          {step === -2 && <Illustration onProviders={() => setStep(-1)} />}
           {step === null && (
             <Projects
               lang={lang}
@@ -175,7 +185,7 @@ export default function App() {
               onOpen={openProject}
             />
           )}
-          {step !== null && step !== -1 && (
+          {step !== null && step !== -1 && step !== -2 && (
             <Wizard
               lang={lang}
               slug={slug}
@@ -207,7 +217,9 @@ function ProjectRail({
   onStep: (n: number | null) => void;
   onNew: () => void;
 }) {
-  const done = STEPS.filter((s) => railRow(s.n, stages, slug).state === "done").length;
+  const mode = project?.mode ?? null;
+  const steps = stepsFor(mode);
+  const done = steps.filter((s) => railRow(s.n, stages, slug, mode).state === "done").length;
 
   return (
     <nav className="rail" aria-label="프로젝트 단계">
@@ -223,7 +235,9 @@ function ProjectRail({
               {project ? project.mode : slug}
             </span>
             <span className="rail-meta">
-              페이지당 컷 {project?.panels?.min ?? "?"}–{project?.panels?.max ?? "?"} · 완료 {done}/{STEPS.length} 단계
+              {project?.mode === "comic"
+                ? `페이지당 1프레임 · 완료 ${done}/${steps.length} 단계`
+                : `페이지당 컷 ${project?.panels?.min ?? "?"}–${project?.panels?.max ?? "?"} · 완료 ${done}/${steps.length} 단계`}
             </span>
           </div>
 
@@ -233,18 +247,20 @@ function ProjectRail({
 
           <StepGroup
             title="프로젝트 전체 — 한 번"
-            steps={STEPS.filter((s) => s.scope === "project" && s.n !== 1)}
+            steps={steps.filter((s) => s.scope === "project" && s.n !== 1)}
             step={step}
             stages={stages}
             slug={slug}
+            mode={mode}
             onStep={onStep}
           />
           <StepGroup
-            title="에피소드마다 — 새 화마다 다시"
-            steps={STEPS.filter((s) => s.scope === "episode")}
+            title={mode === "comic" ? "프레임마다 — 새 만화마다 다시" : "에피소드마다 — 새 화마다 다시"}
+            steps={steps.filter((s) => s.scope === "episode")}
             step={step}
             stages={stages}
             slug={slug}
+            mode={mode}
             onStep={onStep}
           />
         </>
@@ -280,19 +296,21 @@ function StepGroup({
   step,
   stages,
   slug,
+  mode,
   onStep,
 }: {
   title: string;
-  steps: typeof STEPS;
+  steps: ReturnType<typeof stepsFor>;
   step: number | null;
   stages: StageStatus[];
   slug: string | null;
+  mode: string | null;
   onStep: (n: number) => void;
 }) {  return (
     <>
       <div className="rail-group">{title}</div>
       {steps.map((s) => {
-        const row = railRow(s.n, stages, slug);
+        const row = railRow(s.n, stages, slug, mode);
         const active = step === s.n;
         return (
           <button
@@ -317,8 +335,8 @@ function StepGroup({
 }
 
 /** What the rail says about a step, read off the stage table. */
-export function railRow(n: number, stages: StageStatus[], slug: string | null): RailRow {
-  const meta = stepMeta(n);
+export function railRow(n: number, stages: StageStatus[], slug: string | null, mode?: string | null): RailRow {
+  const meta = stepMeta(n, mode);
   if (!meta || !slug) return { state: "idle", note: "프로젝트를 여세요" };
 
   // project settings (step 2) are stored in project.json; treated as done when project exists

@@ -24,17 +24,12 @@ const MODES = [
   {
     id: "manga",
     label: "만화",
-    desc: "컷이 여러 개 있는 원고 페이지 — 6단계 계획과 7단계 컷까지 전부 갑니다.",
+    desc: "컷이 여러 개 있는 원고 페이지 — 페이지 계획과 컷 분할까지 전부 갑니다.",
   },
   {
     id: "comic",
-    label: "코믹스",
-    desc: "대사와 효과음이 있는 일러스트 한 장 — 6단계까지만 갑니다.",
-  },
-  {
-    id: "illustration",
-    label: "일러스트",
-    desc: "대사 없는 일러스트 한 장 — 5단계 레퍼런스 시트에서 끝납니다.",
+    label: "컷 만화",
+    desc: "한 장소에서 이어지는 정지 프레임들 — 페이지마다 한 컷, 대사로 진행하는 트위터식 만화. 컷 분할은 없습니다.",
   },
 ];
 
@@ -140,14 +135,14 @@ export default function StepMode({
                 title: draft.title,
                 mode: draft.mode,
                 languages: { default: "ko", all: ["ko", "en", "ja"] },
-                reading_direction: draft.reading_direction,
+                reading_direction: draft.mode === "comic" ? "ltr" : draft.reading_direction,
                 canvas: { tier: draft.tier, ratio: "a4_portrait" },
                 art_style: draft.art_style,
-                panels: { min: draft.min, max: draft.max },
+                panels: draft.mode === "comic" ? { min: 1, max: 1 } : { min: draft.min, max: draft.max },
                 cut_mode: draft.cut_mode,
-                detail_panels: draft.detail_panels,
+                detail_panels: draft.mode === "comic" ? false : draft.detail_panels,
                 story_focus: draft.story_focus,
-                episode_pages: draft.episode_pages,
+                episode_pages: draft.mode === "comic" ? 4 : draft.episode_pages,
               })
             }
           >

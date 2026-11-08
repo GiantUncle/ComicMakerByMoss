@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import bible, history, projects, providers, skills
+from . import bible, favorites, history, illustration, projects, providers, skills
 from .derive.router import router as derive_router
 from .stages.router import router as stages_router
 
@@ -32,6 +32,8 @@ app.include_router(projects.router)
 app.include_router(bible.router)
 app.include_router(derive_router)
 app.include_router(stages_router)
+app.include_router(illustration.router)
+app.include_router(favorites.router)
 
 
 # ------------------------------------------------------------------- history

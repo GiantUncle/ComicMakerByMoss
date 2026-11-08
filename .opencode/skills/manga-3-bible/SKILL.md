@@ -16,10 +16,11 @@ them.
 
 ## Steps
 
-1. Read the episode's source and list every character who speaks or matters in
-   this episode, plus the recurring props. Those already in the pool stay as they
-   are; the new ones are the work of this pass. Ask the user to confirm, rename,
-   add or remove.
+1. Read the episode's source — `episodes/<ep>/source/novel.txt` (manga) or
+   `episodes/<ep>/source/brief.md` (comic) — and list every character who speaks
+   or matters in it, plus the recurring props. Those already in the pool stay as
+   they are; the new ones are the work of this pass. Ask the user to confirm,
+   rename, add or remove.
 2. Record the episode's cast subset in `episodes/<ep>/episode.json` — the pool
    members who appear in this episode, by slug.
 3. Write the pool:
@@ -47,6 +48,10 @@ them.
 }
 ```
 
+**The example above is a shape, not content.** Never copy its names, anchors or
+outfits — derive every card from the source. A card whose anchors match the
+example instead of the story is wrong.
+
 4. **`id` is a kebab-case slug of the character's name** — `sol-eum`, `brown`,
    `lee-jaheon`. It is the folder name and the wiring key.
    A walk-on with no name takes a slug of the role: `masked-chief`, `bus-driver`.
@@ -57,6 +62,13 @@ them.
    sheet is rendered; baking "gouache 2D illustration" into a character makes
    every character carry the same style sentence and says nothing about the
    face.
+
+   **The `default_outfit` follows the story.** The descriptor is copied onto the
+   frame that anchors the character, so it must match what the source/brief has
+   them wearing (a uniform, a costume, a specific garment). If the brief puts the
+   character in a high-neck zip dress, that is the `default_outfit` — not a
+   generic cardigan. A deliberately different outfit is a per-frame change, not
+   the card.
 6. `name` carries all three languages. A name enters an image only where the
    name itself is drawn — a name tag, a sign, a title. Everywhere else a person
    is **described, not named**: the `descriptor` and the `identifier_label`
