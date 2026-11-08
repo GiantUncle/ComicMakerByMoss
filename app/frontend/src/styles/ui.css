@@ -440,6 +440,16 @@
 .board-card[data-state="blocked"] .board-glyph { color: var(--danger); }
 .board-card[data-state="ready"] .board-glyph { color: var(--fg-muted); }
 
+/* Narrow windows: the seven cards cannot hold their names on one line, so the
+   track wraps into rows and the arrows (which only mean "next on this row")
+   step aside. The name stays whole instead of being ellipsised. */
+@media (max-width: 1100px) {
+  .board { flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .board-track { flex-wrap: wrap; row-gap: var(--s-2); }
+  .board-cell { flex: 1 1 128px; }
+  .board-arrow { display: none; }
+}
+
 /* ------------------------------------------------------------------ main -- */
 .main {
   overflow: auto;
@@ -510,14 +520,17 @@
 }
 
 /* ----------------------------------------------------------------- cards -- */
+/* auto-fit, not auto-fill: empty tracks collapse, so one card fills the row,
+   two split it evenly, three split it three ways, and only past the minimum
+   does the next card wrap onto a new row. */
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(288px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(288px, 1fr));
   gap: var(--s-4);
 }
 
 .cards--wide {
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
 }
 
 .rows {
@@ -579,6 +592,14 @@
 
 .kv dd {
   margin: 0;
+}
+
+/* Narrow windows: a 180px label column starves the value column, so the
+   label sits above its value and the text keeps the full card width. */
+@media (max-width: 1000px) {
+  .kv { grid-template-columns: 1fr; gap: 0; }
+  .kv dt { font-size: 11px; margin-top: var(--s-2); }
+  .kv dd { margin-bottom: var(--s-1); }
 }
 
 .field select[size] {
@@ -960,7 +981,7 @@ input[type="range"] {
 /* ----------------------------------------------------------- page plan -- */
 .plan-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: var(--s-3);
 }
 

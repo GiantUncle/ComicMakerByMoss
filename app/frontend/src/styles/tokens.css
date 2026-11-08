@@ -218,6 +218,17 @@ body {
 .chip--warn { color: var(--warning); }
 .chip--bad  { color: var(--danger);  }
 
+/* A long anchor phrase stays on one line in a card instead of growing into a
+   three-line pill; the full text stays reachable through title. */
+.chip--ellipsis {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: middle;
+}
+
 .field { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); }
 .field > label { font-size: var(--text-sm); color: var(--fg-muted); }
 .field input, .field select, .field textarea {

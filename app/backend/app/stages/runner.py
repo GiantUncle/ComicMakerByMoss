@@ -1504,7 +1504,30 @@ def _run_comic_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback,
             if ch:
                 bits.append(f"The only thing that changes here: {ch}.")
         continuity = " ".join(bits) or None
-        draft = build.compile_single_frame(scene, project, characters, lang, continuity=continuity)
+        # the place's colour/light (plan) and the page's count tags close the
+        # style line, the way the reference does
+        girls = boys = others = 0
+        for cid in (scene.get("characters") or []):
+            low = str(characters.get(cid, {}).get("descriptor", "")).lower()
+            if low.startswith("she is") or " woman" in low or "girl" in low:
+                girls += 1
+            elif low.startswith("he is") or " man" in low or "boy" in low:
+                boys += 1
+            else:
+                others += 1
+        tag_parts = []
+        if girls:
+            tag_parts.append(f"{girls}girl")
+        if boys:
+            tag_parts.append(f"{boys}boy")
+        if others:
+            tag_parts.append(f"{others}other")
+        look = str(plan.get("look", "")).strip()
+        style_suffix = ", ".join(([look] if look else []) + tag_parts)
+        draft = build.compile_single_frame(
+            scene, project, characters, lang,
+            continuity=continuity, style_suffix=style_suffix or None,
+        )
         issues += validate.validate_draft(draft, project)
         prompt_text = build.compile_draft(draft)
         prompt_obj = json.loads(prompt_text[prompt_text.index("{"):])

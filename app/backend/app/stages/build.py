@@ -591,6 +591,7 @@ def compile_single_frame(
     lang: str,
     tier_override: str | None = None,
     continuity: str | None = None,
+    style_suffix: str | None = None,
 ) -> dict[str, Any]:
     """A comic scene -> a Type C draft: one still frame plus its lettering.
 
@@ -649,8 +650,14 @@ def compile_single_frame(
         present.insert(0, anchor)
     present = [c for c in present if c in characters] or present
 
+    # the place's colour/light and the count tags go on the style line, the way
+    # the reference does (`… deep navy-blue palette with soft bright indoor
+    # daylight, crisp … speech bubbles, 1girl, 1boy, …`)
+    style_line = style
+    if style_suffix:
+        style_line = f"{style}, {style_suffix.strip()}".strip(", ")
     index_prose = cast_index_prose(present, characters)
-    caption = style if not index_prose else f"{style}\n{index_prose}"
+    caption = style_line if not index_prose else f"{style_line}\n{index_prose}"
 
     scene_text = str(scene.get("scene", "")).strip()
     # each present figure's canonical descriptor, lead first; §9 keeps its

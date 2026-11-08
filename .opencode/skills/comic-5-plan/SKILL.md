@@ -33,6 +33,8 @@ another artist could draw it and get the same page.
 
   // one place, fixed for the whole comic
   "setting": "a subway car interior at night — the silver pole left of centre, the blue seats, the lit route map above the far doors",
+  // the place's colour and light, in one clause — named hues, not "warm"
+  "look": "cool clinical teal and fluorescent white under even overhead light",
   // the through-line: the running situation and the emotional arc, frame to frame
   "through_line": "she drops an earbud; he stoops and returns it; a small thank-you; he steps off and she watches him go",
 
@@ -59,9 +61,10 @@ another artist could draw it and get the same page.
 
 ## Rules
 
-- **One place.** `setting` fixes it once; every frame keeps the same seats,
-  pole, props and light. `camera` holds roughly still — a small change, not a
-  new angle (`twitter-comic.md` §2).
+- **One place.** `setting` fixes it once; `look` fixes its colour and light for
+  the whole comic (named hues, one clause). Every frame keeps the same seats,
+  pole, props, palette and light. `camera` holds roughly still — a small change,
+  not a new angle (`twitter-comic.md` §2).
 - **`in_frame` is every figure drawn on the page**, each with where they are. A
   voice off-frame is not in frame.
 - **`state_in` is what continues from the previous frame** (the mood, the body,

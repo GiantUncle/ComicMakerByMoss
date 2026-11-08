@@ -82,7 +82,7 @@ export function CastCardView({
             anchors.length ? (
               <span className="row" style={{ flexWrap: "wrap", gap: "var(--s-1)" }}>
                 {anchors.map((a) => (
-                  <span key={a} className="chip">
+                  <span key={a} className="chip chip--ellipsis" title={a}>
                     {a}
                   </span>
                 ))}

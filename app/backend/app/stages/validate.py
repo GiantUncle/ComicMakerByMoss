@@ -693,6 +693,9 @@ def validate_comic_plan(plan: dict, project: dict | None = None) -> list[dict]:
     if not str(plan.get("through_line", "")).strip():
         out.append(issue("error", "comic-plan.no-through-line", "plan",
                          "through_line (the running situation and emotional arc) is empty"))
+    if not str(plan.get("look", "")).strip():
+        out.append(issue("error", "comic-plan.no-look", "plan",
+                         "look (the place's colour and light, one clause) is empty"))
     pages = plan.get("pages")
     if not isinstance(pages, list) or not pages:
         return out + [issue("error", "comic-plan.no-pages", "plan", "pages must be a nonempty array")]
