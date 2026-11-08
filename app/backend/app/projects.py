@@ -23,6 +23,13 @@ PROJECTS = Path(os.environ.get("CM_PROJECTS", REPO / "projects"))
 SLUG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 TIERS = ("S", "M", "L", "XL")
 MODES = ("manga", "comic")   # illustration is a top-level tool, not a project (see docs/design-output-modes.md)
+
+# The default drawing style, in one sentence for `summary.caption`. A project
+# carries this so every page looks the same; the user may replace it.
+DEFAULT_STYLE_PROMPT = (
+    "2D digital painting comic, finely rendered luminous facial features and "
+    "delicate hair strands against breathable painterly brushwork, selective focus"
+)
 ROUTES = ("provided", "premise", "genre", "outline")
 # how the dominant panel of a page is spent — a strategy the agent applies, not a rule
 FOCUS = ("character", "narrative", "balanced")
@@ -93,6 +100,7 @@ class NewProject(BaseModel):
     reading_direction: str = "rtl"
     canvas: Canvas = Canvas()
     art_style: str = "fkey_painterly"
+    art_style_prompt: str = DEFAULT_STYLE_PROMPT   # the project-wide drawing style
     panels: Panels = Panels()
     cut_mode: str = "balanced"
     detail_panels: bool = False   # allow small/detailed cuts (5+ panels, insets)
@@ -106,6 +114,7 @@ class ProjectPatch(BaseModel):
     reading_direction: str | None = None
     languages: Languages | None = None
     art_style: str | None = None
+    art_style_prompt: str | None = None
     panels: Panels | None = None
     detail_panels: bool | None = None
     story_focus: str | None = None
@@ -197,6 +206,7 @@ def create_project(body: NewProject) -> dict:
         "reading_direction": body.reading_direction,
         "languages": body.languages.model_dump(),
         "art_style": body.art_style,
+        "art_style_prompt": body.art_style_prompt,
         "panels": panels,
         "detail_panels": body.detail_panels,
         "story_focus": body.story_focus,

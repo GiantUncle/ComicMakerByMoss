@@ -78,6 +78,12 @@ example instead of the story is wrong.
      action on the page where it changes.
    - Cover **each item in the §9 list** — do not drop **eye size**, hair style, or
      the collar/sleeves of the clothing.
+   - **A side is the character's OWN left/right**, never the viewer's:
+     `a small mole under her left eye` means *her* left, which falls on the
+     viewer's right when she faces the camera. State a side-specific mark once,
+     from her body; it stays on that side and never doubles, however the shot is
+     framed. Keep the signature to **one** such mark — a left/right feature is the
+     easiest thing for a model to mirror.
    - **Never** pose, expression, gaze, camera angle, framing, lighting,
      background, art style or medium, a numeric age, or invented names,
      personality or backstory. If several figures are visible, describe one.

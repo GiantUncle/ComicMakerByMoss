@@ -292,6 +292,11 @@ length, colour or grayscale shade, hairstyle, bangs, braids · animal ears if
 present · headwear · accessories · clothing including collar, sleeves and
 decorations.
 
+**A side belongs to the character, not the viewer.** `a mole under her left eye`
+is *her* left — it reads on the viewer's right when she faces the camera, and it
+stays on that side in every frame, never mirrored and never doubled. Say a side
+once, from the character's own body.
+
 **What never enters the descriptor.**
 
 - pose, expression, gaze

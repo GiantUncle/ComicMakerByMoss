@@ -290,21 +290,21 @@ def text_caption(kind: str, bubble: str, vertical: bool, tail: str | None,
     if kind == "narration":
         if bubble == "solid":
             return f"Clean {w}{o} narration text in a solid black rectangular box with white lettering, no balloon tail."
-        return f"Clean {w}{o} narration text in a plain white rectangular box, no balloon tail."
+        return f"Clean {w}{o} narration text in an opaque white rectangular box with a thin black outline, no balloon tail."
     if kind == "thought":
-        return f"Clean {w}{o} thought text in a cloud-shaped balloon with a dotted outline and no solid tail."
+        return f"Clean {w}{o} thought text in an opaque white cloud-shaped balloon with a dotted outline and no solid tail."
     if kind == "sign":
         return f"Clean {w}{o} signage text painted on the surface of the object."
     if kind == "title":
         return f"Clean {w}{o} title lettering set over the art."
     if bubble == "round":
-        return f"Clean {w}{o} dialogue text in a rounded speech balloon{tail_phrase}."
+        return f"Clean {w}{o} dialogue text in a rounded, opaque white speech balloon with a thin black outline{tail_phrase}."
     if bubble == "oval":
-        return f"Clean {w}{o} dialogue text in an oval speech balloon{tail_phrase}."
+        return f"Clean {w}{o} dialogue text in an oval, opaque white speech balloon with a thin black outline{tail_phrase}."
     if bubble == "jagged":
-        return f"Clean {w}{o} shouted dialogue text in a jagged balloon{tail_phrase}."
+        return f"Clean {w}{o} shouted dialogue text in a jagged, opaque white balloon with a thin black outline{tail_phrase}."
     if bubble == "rect":
-        return f"Clean {w}{o} dialogue text in a flat rectangular balloon{tail_phrase}."
+        return f"Clean {w}{o} dialogue text in a flat, opaque white rectangular balloon with a thin black outline{tail_phrase}."
     return f"Loose {w}{o} floating lettering on the art, no balloon outline."
 
 
@@ -589,6 +589,7 @@ def compile_single_frame(
     characters: dict[str, dict],
     lang: str,
     tier_override: str | None = None,
+    continuity: str | None = None,
 ) -> dict[str, Any]:
     """A comic scene -> a Type C draft: one still frame plus its lettering.
 
@@ -606,7 +607,24 @@ def compile_single_frame(
     tier = tier_override or project.get("canvas", {}).get("tier", "M")
     width, height = tier_size(tier)
 
-    style = str(scene.get("style", "")).strip()
+    # The scene's boxes are in the canvas it was authored on. A resolution change
+    # is the same composition at another size, so scale them to the target tier
+    # (proportional: the ratio is fixed, the layout does not move).
+    base_tier = scene.get("canvas_tier") or project.get("canvas", {}).get("tier", "M")
+    try:
+        base_w, base_h = tier_size(base_tier)
+    except KeyError:
+        base_w, base_h = width, height
+    sx = width / base_w if base_w else 1.0
+    sy = height / base_h if base_h else 1.0
+
+    def _box(raw: list[float]) -> list[int]:
+        return [round(raw[0] * sx), round(raw[1] * sy), round(raw[2] * sx), round(raw[3] * sy)]
+
+    # the drawing style is the PROJECT's, chosen by the user (a preset or their
+    # own sentence) — not something the story model bakes in. The scene's own
+    # `style` is only a fallback for a project that has not set one.
+    style = str(project.get("art_style_prompt") or "").strip() or str(scene.get("style", "")).strip()
     texts = scene.get("texts", []) or []
 
     # Who is drawn on this frame, lead first. `characters` is the frame's cast;
@@ -642,14 +660,21 @@ def compile_single_frame(
         if characters.get(c, {}).get("descriptor")
     ]
     head = " ".join(descs)
-    frame_cap = f"{head} {scene_text}".strip() if head else scene_text
+    body_text = f"{head} {scene_text}".strip() if head else scene_text
+    # continuity: page N is not a fresh picture — it is the next frame of one
+    # running moment. Without this the model invents a new mood each page.
+    if continuity:
+        body_text = f"{body_text} {continuity.strip()}".strip()
+    frame_cap = body_text
     # any figure on the page makes it a `character` frame
     label = "character" if present else (scene.get("label") or "object")
 
+    raw_frame = scene.get("frame_bbox")
     frame_item: dict[str, Any] = {
         "label": label,
         "caption": frame_cap,
-        "bbox": _frame_bbox(width, height, scene.get("frame_bbox")),
+        "bbox": _box(raw_frame) if isinstance(raw_frame, list) and len(raw_frame) == 4
+        else _frame_bbox(width, height),
     }
     if anchor:
         frame_item["ref_id"] = anchor
@@ -661,7 +686,9 @@ def compile_single_frame(
             continue
         vertical = bool(t.get("vertical"))
         bbox = t.get("bbox")
-        if not (isinstance(bbox, list) and len(bbox) == 4):
+        if isinstance(bbox, list) and len(bbox) == 4:
+            bbox = _box(bbox)
+        else:
             bbox = _default_text_box(body, vertical, width, height, len(items))
         # R-C: a tail points at the character's identifier label, never the raw
         # card id — a slug is not a description.

@@ -52,6 +52,22 @@ Return exactly one object and nothing else:
 One `pages` entry per page in the block. **One frame a page** — never split a page
 into panels.
 
+## 1.5. Draw from the plan — it is the spec
+
+The plan (stage 5) is a storyboard spec, not a list. Each frame is built from it:
+
+- **`camera`** — draw the shot the plan names, and hold it. The camera does not
+  move between frames except where the plan changes it.
+- **`in_frame`** — the figures drawn on this page, and where each is. Put them
+  where the plan puts them; `characters` is exactly these ids, lead first.
+- **`state_in` + `change`** — the frame **opens in the state carried over from the
+  previous frame**, and only `change` differs. If `state_in` is a startled
+  flinch, the face is *still* startled here; it must not become a fresh bright
+  smile. The expression is the continuous emotion, not a new one.
+- **`sfx`** — if the plan names a sound, put it in the frame's lettering (a `sfx`
+  text). A comic with no sound effects where sounds happen is wrong.
+- **`setting`/`place`** — the same seats, pole, props and light every frame.
+
 ## 2. `scene` — the frame, drawn in words
 
 `scene` describes the **picture**, not the plot. Write it as a drawing an artist

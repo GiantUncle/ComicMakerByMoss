@@ -686,6 +686,13 @@ def validate_comic_plan(plan: dict, project: dict | None = None) -> list[dict]:
     if total % 4:
         out.append(issue("error", "comic-plan.not-multiple-of-4", "plan",
                          f"page_total {total} is not a multiple of 4"))
+    # the plan is a spec: the one place and the through-line are its spine
+    if not str(plan.get("setting", "")).strip():
+        out.append(issue("error", "comic-plan.no-setting", "plan",
+                         "setting (the one place, in detail) is empty"))
+    if not str(plan.get("through_line", "")).strip():
+        out.append(issue("error", "comic-plan.no-through-line", "plan",
+                         "through_line (the running situation and emotional arc) is empty"))
     pages = plan.get("pages")
     if not isinstance(pages, list) or not pages:
         return out + [issue("error", "comic-plan.no-pages", "plan", "pages must be a nonempty array")]
@@ -696,9 +703,18 @@ def validate_comic_plan(plan: dict, project: dict | None = None) -> list[dict]:
         pw = f"page {page.get('page', i + 1)}"
         if not str(page.get("moment", "")).strip():
             out.append(issue("error", "comic-plan.no-moment", pw, "moment (the still) is empty"))
+        if not str(page.get("camera", "")).strip():
+            out.append(issue("error", "comic-plan.no-camera", pw,
+                             "camera (framing/POV) is empty — the shot must hold across frames"))
+        if not isinstance(page.get("in_frame"), list) or not page["in_frame"]:
+            out.append(issue("error", "comic-plan.no-in-frame", pw,
+                             "in_frame must list every figure drawn on this page"))
+        if not str(page.get("state_in", "")).strip():
+            out.append(issue("error", "comic-plan.no-state-in", pw,
+                             "state_in (what continues from the previous frame) is empty"))
         if int(page.get("page", 0)) >= 2 and not str(page.get("change", "")).strip():
             out.append(issue("error", "comic-plan.no-change", pw,
-                             "page 2 onward says what changes from the previous frame"))
+                             "page 2 onward says the single thing that changes from the previous frame"))
         # a comic page is one frame: the panel machinery must not leak in
         for forbidden in ("template_suggestion", "panel_target", "split", "focus"):
             if forbidden in page:

@@ -1477,6 +1477,7 @@ def _run_comic_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback,
     prompts_dir = root / "episodes" / ep / "prompts"
     files: list[str] = []
     issues: list[dict] = []
+    plan_pages = {int(p.get("page", 0)): p for p in plan.get("pages", [])}
 
     for n in wanted:
         scene_path = pages_dir / f"page-{n:03d}.scene.json"
@@ -1484,7 +1485,21 @@ def _run_comic_prompts(root: Path, stage: Stage, ep: str, caller, dry, feedback,
             raise StageError(f"missing comic scene for page {n} — run comic-6 (장면) first")
         scene = _read_json(scene_path)
         issues += validate.validate_comic_scene(scene, project)
-        draft = build.compile_single_frame(scene, project, characters, lang)
+        # a page is the next frame of one running moment, not a fresh picture —
+        # tell the page what it continues and the single thing that changes
+        pp = plan_pages.get(n, {})
+        prev = plan_pages.get(n - 1, {})
+        bits: list[str] = []
+        if page_total > 1:
+            bits.append(f"This is frame {n} of {page_total} — one continuous moment in one place, read in order.")
+        if prev.get("moment"):
+            bits.append(f"It continues directly from the previous frame: {str(prev['moment']).strip().rstrip('.')}.")
+        if pp.get("state_in"):
+            bits.append(f"It opens in the state carried in: {str(pp['state_in']).strip().rstrip('.')}.")
+        if pp.get("change"):
+            bits.append(f"The only thing that changes here: {str(pp['change']).strip().rstrip('.')}.")
+        continuity = " ".join(bits) or None
+        draft = build.compile_single_frame(scene, project, characters, lang, continuity=continuity)
         issues += validate.validate_draft(draft, project)
         prompt_text = build.compile_draft(draft)
         prompt_obj = json.loads(prompt_text[prompt_text.index("{"):])
